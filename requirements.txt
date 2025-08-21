@@ -2,6 +2,7 @@ streamlit
 requests
 beautifulsoup4
 lxml
-astpretty
 numpy
 pillow
+PyPDF2
+
