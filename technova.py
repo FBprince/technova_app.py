@@ -886,67 +886,98 @@
 
 
 
-
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import ast
-import astpretty
-import textwrap
+import os
+import re
 import math
-import random
-import numpy as np
-from PIL import Image
-import io
+from io import BytesIO
 
-# ---------------------------
-# Helper Functions
-# ---------------------------
+# ================== PAGE CONFIG ==================
+st.set_page_config(page_title="TechNova AI Hub", layout="wide")
 
-def summarize_text(text, bullet=False):
-    sentences = text.split(".")
-    sentences = [s.strip() for s in sentences if s.strip()]
-    if bullet:
-        summary = "\n".join([f"- {s}" for s in sentences[:5]])
-    else:
-        summary = " ".join(sentences[:5])
-    return summary
+# ================== CUSTOM CSS ==================
+st.markdown("""
+    <style>
+        /* Background */
+        .stApp {
+            background: linear-gradient(135deg, #0a0f1c, #001f3f, #0a0f1c);
+            color: #E0E0E0;
+        }
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            background-color: #001a33;
+            color: #00e6e6;
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-weight: bold;
+            border: 1px solid #00e6e6;
+        }
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(90deg, #00b3b3, #001f3f);
+            color: white;
+            border: 1px solid #00ffff;
+        }
+        /* Buttons */
+        .stButton>button {
+            background: linear-gradient(90deg, #00b3b3, #004466);
+            color: white;
+            border-radius: 12px;
+            padding: 8px 18px;
+            font-weight: bold;
+            border: none;
+            box-shadow: 0px 0px 10px #00e6e6;
+        }
+        .stButton>button:hover {
+            background: linear-gradient(90deg, #00ffff, #005577);
+            color: black;
+        }
+        /* Text areas */
+        textarea, input, .stTextInput>div>div>input {
+            border: 1px solid #00e6e6 !important;
+            border-radius: 10px !important;
+            background-color: #001a33 !important;
+            color: #E0E0E0 !important;
+        }
+        /* Progress Bar */
+        .stProgress > div > div {
+            background: linear-gradient(90deg, #00e6e6, #004466);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ================== HELPERS ==================
+def summarize_text(text, max_sentences=3):
+    sentences = re.split(r'(?<=[.!?]) +', text.strip())
+    return " ".join(sentences[:max_sentences]) if sentences else "No content to summarize."
 
 def analyze_code(code):
-    try:
-        tree = ast.parse(code)
-        formatted = astpretty.pformat(tree)
-        return "✅ Code is syntactically correct.", formatted, None
-    except SyntaxError as e:
-        error_message = f"❌ Syntax error at line {e.lineno}, offset {e.offset}: {e.text}"
-        possible_fixes = [
-            "Check for missing colons ':' at the end of statements.",
-            "Ensure all parentheses (), brackets [], and braces {} are properly closed.",
-            "Verify indentation (Python is sensitive to tabs vs spaces).",
-            "Look for missing or extra quotes around strings."
-        ]
-        return error_message, None, possible_fixes
+    errors, suggestions = [], []
+    if "print " in code and "(" not in code:
+        errors.append("Possible Python 2 print statement.")
+        suggestions.append("Use print() instead of print.")
+    if "==" in code and "if" not in code and "while" not in code:
+        errors.append("Suspicious use of '=='.")
+        suggestions.append("Check if you meant '=' for assignment.")
+    if "import " not in code:
+        suggestions.append("Consider adding necessary imports.")
+    return errors, suggestions
 
-def detect_ai_generated(text):
-    # Fake scoring for demo: in production replace with ML model
-    score = random.random()
-    label = "AI-generated" if score > 0.5 else "Human-written"
+def detect_ai_text(text):
+    words = text.split()
+    score = min(100, len([w for w in words if len(w) > 7]) * 2)
+    label = "AI-Generated" if score > 50 else "Human-Written"
     return label, score
 
-def copy_download_section(content, filename):
-    st.code(content)
-    st.download_button("⬇️ Download", content, file_name=filename)
-    st.text_area("📋 Copy Summary", content, height=150)
+def copy_download_buttons(content, filename="output.txt"):
+    st.download_button("📥 Download", content, file_name=filename)
+    st.code(content, language="markdown")
 
-# ---------------------------
-# Streamlit UI
-# ---------------------------
-
-st.set_page_config(page_title="TechNova App", layout="wide")
-
-st.title("🚀 TechNova Multi-Tool App")
-
+# ================== TABS ==================
 tabs = st.tabs([
     "📄 Document Summarizer",
     "💻 Code Analyzer",
@@ -954,97 +985,85 @@ tabs = st.tabs([
     "🌐 URL Fetch & Explain"
 ])
 
-# ---------------------------
-# Document Summarizer Tab
-# ---------------------------
+# ---------- TAB 1: DOCUMENT SUMMARIZER ----------
 with tabs[0]:
     st.header("📄 Document Summarizer")
-    uploaded_file = st.file_uploader("Upload a text file", type=["txt"], key="doc_sum_upload")
-    input_text = st.text_area("Or paste your text here:", height=200, key="doc_sum_text")
-    bullet_format = st.checkbox("Return bullet outline", key="doc_sum_bullet")
 
-    if st.button("Summarize Document", key="doc_sum_button"):
+    user_text = st.text_area("Paste text to summarize:")
+    uploaded_file = st.file_uploader("Or upload a document", type=["txt", "md", "docx", "pdf"])
+
+    if user_text or uploaded_file:
         if uploaded_file:
-            text = uploaded_file.read().decode("utf-8")
+            content = uploaded_file.read().decode(errors="ignore")
         else:
-            text = input_text
+            content = user_text
+        summary = summarize_text(content)
 
-        if text:
-            summary = summarize_text(text, bullet_format)
-            with st.expander("📑 Summary Report", expanded=True):
-                copy_download_section(summary, "document_summary.txt")
-        else:
-            st.warning("⚠️ Please provide a document to summarize.")
+        with st.expander("📌 Summary", expanded=True):
+            st.write(summary)
+            copy_download_buttons(summary, "summary.txt")
 
-# ---------------------------
-# Code Analyzer Tab
-# ---------------------------
+# ---------- TAB 2: CODE ANALYZER ----------
 with tabs[1]:
     st.header("💻 Code Analyzer")
-    uploaded_code = st.file_uploader("Upload a Python code file", type=["py"], key="code_upload")
-    input_code = st.text_area("Or paste your Python code here:", height=200, key="code_input")
 
-    if st.button("Analyze Code", key="code_analyze_button"):
+    user_code = st.text_area("Paste your code here:")
+    uploaded_code = st.file_uploader("Or upload a code file", type=["py", "js", "cpp", "java", "txt"])
+
+    if user_code or uploaded_code:
         if uploaded_code:
-            code = uploaded_code.read().decode("utf-8")
+            code = uploaded_code.read().decode(errors="ignore")
         else:
-            code = input_code
+            code = user_code
 
-        if code:
-            result, formatted, fixes = analyze_code(code)
-            with st.expander("📝 Code Analysis Report", expanded=True):
-                st.write(result)
-                if formatted:
-                    st.code(formatted, language="python")
-                if fixes:
-                    st.subheader("🔧 Possible Fixes:")
-                    for fix in fixes:
-                        st.write(f"- {fix}")
-                copy_download_section(result if not formatted else formatted, "code_analysis.txt")
-        else:
-            st.warning("⚠️ Please provide some code to analyze.")
+        errors, suggestions = analyze_code(code)
 
-# ---------------------------
-# AI vs Human Detector Tab
-# ---------------------------
+        with st.expander("📌 Analysis Report", expanded=True):
+            if errors:
+                st.error("⚠️ Errors found:")
+                for e in errors: st.write("- " + e)
+            else:
+                st.success("✅ No critical errors spotted.")
+            if suggestions:
+                st.info("💡 Suggestions:")
+                for s in suggestions: st.write("- " + s)
+            copy_download_buttons("\n".join(errors + suggestions) or "No issues found.", "code_analysis.txt")
+
+# ---------- TAB 3: AI vs HUMAN DETECTOR ----------
 with tabs[2]:
-    st.header("🤖 AI vs Human Text/Code Detector")
-    uploaded_ai = st.file_uploader("Upload a text/code file", type=["txt", "py"], key="ai_upload")
-    input_ai = st.text_area("Or paste text/code here:", height=200, key="ai_input")
+    st.header("🤖 AI vs Human Detector")
 
-    if st.button("Detect AI vs Human", key="ai_detect_button"):
-        if uploaded_ai:
-            content = uploaded_ai.read().decode("utf-8")
+    user_text = st.text_area("Paste text for analysis:")
+    uploaded_file = st.file_uploader("Or upload text/code", type=["txt", "md"])
+
+    if user_text or uploaded_file:
+        if uploaded_file:
+            text = uploaded_file.read().decode(errors="ignore")
         else:
-            content = input_ai
+            text = user_text
 
-        if content:
-            label, score = detect_ai_generated(content)
-            percentage = int(score * 100)
-            with st.expander("🔍 Detection Result", expanded=True):
-                st.subheader(f"Result: {label}")
-                st.progress(percentage / 100)
-                st.write(f"Confidence: {percentage}%")
-                copy_download_section(f"{label} (Confidence: {percentage}%)", "ai_detection.txt")
-        else:
-            st.warning("⚠️ Please provide text or code for detection.")
+        label, score = detect_ai_text(text)
 
-# ---------------------------
-# URL Fetch & Explain Tab
-# ---------------------------
+        with st.expander("📊 Detection Result", expanded=True):
+            st.write(f"**Result:** {label}")
+            st.progress(score / 100)
+            st.write(f"Confidence: {score}%")
+            copy_download_buttons(f"{label}\nConfidence: {score}%", "detection.txt")
+
+# ---------- TAB 4: URL FETCH & EXPLAIN ----------
 with tabs[3]:
     st.header("🌐 URL Fetch & Explain")
-    url = st.text_input("Enter a URL to fetch content:", key="url_fetch")
-    if st.button("Fetch & Explain", key="url_button"):
-        if url:
-            try:
-                response = requests.get(url)
-                soup = BeautifulSoup(response.content, "lxml")
-                text = " ".join([p.text for p in soup.find_all("p")])
-                summary = summarize_text(text)
-                with st.expander("🌍 URL Content Summary", expanded=True):
-                    copy_download_section(summary, "url_summary.txt")
-            except Exception as e:
-                st.error(f"Failed to fetch content: {e}")
-        else:
-            st.warning("⚠️ Please enter a valid URL.")
+
+    url = st.text_input("Enter a URL to fetch content:")
+    if url:
+        try:
+            response = requests.get(url, timeout=5)
+            soup = BeautifulSoup(response.text, "html.parser")
+            text = " ".join([p.text for p in soup.find_all("p")])
+            summary = summarize_text(text)
+
+            with st.expander("🌍 Page Summary", expanded=True):
+                st.write(summary)
+                copy_download_buttons(summary, "url_summary.txt")
+        except Exception as e:
+            st.error(f"Failed to fetch URL: {e}")
