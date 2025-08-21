@@ -302,6 +302,16 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -309,7 +319,7 @@ import re
 import base64
 import ast
 from collections import Counter
-import math  # ✅ Added math module
+import math
 
 # =============================
 # 🌌 Canvas Star Background + Neon Text
@@ -330,57 +340,37 @@ def set_canvas_stars():
                     dx: (Math.random()-0.5)*0.3, dy: (Math.random()-0.5)*0.3, alpha: Math.random()});
     }
     function draw() {
-        ctx.fillStyle = '#0a0b1c';
-        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#0a0b1c'; ctx.fillRect(0,0,canvas.width,canvas.height);
         for(let s of stars){
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
             ctx.fillStyle = "rgba(0,255,255,"+s.alpha+")";
             ctx.fill();
-            s.x += s.dx; s.y += s.dy;
-            s.alpha += (Math.random()-0.5)*0.02;
-            if(s.alpha<0)s.alpha=0;
-            if(s.alpha>1)s.alpha=1;
-            if(s.x<0)s.x=canvas.width;
-            if(s.x>canvas.width)s.x=0;
-            if(s.y<0)s.y=canvas.height;
-            if(s.y>canvas.height)s.y=0;
+            s.x += s.dx; s.y += s.dy; s.alpha += (Math.random()-0.5)*0.02;
+            if(s.alpha<0)s.alpha=0; if(s.alpha>1)s.alpha=1;
+            if(s.x<0)s.x=canvas.width; if(s.x>canvas.width)s.x=0;
+            if(s.y<0)s.y=canvas.height; if(s.y>canvas.height)s.y=0;
         }
         requestAnimationFrame(draw);
     }
     draw();
     </script>
     <style>
-    body, [data-testid="stAppViewContainer"] {
-        background-color: #0a0b1c;
-        color: #00f9ff;
-        font-family: 'Orbitron', 'Trebuchet MS', monospace;
-        text-shadow: 0 0 6px #00f9ff, 0 0 12px #00cfff;
-        overflow-x:hidden;
-    }
-    h1,h2,h3,h4,h5,h6 { color:#00f9ff !important; text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff,0 0 24px #00aaff; }
-    p,div,span,label { color:#a0f0ff !important; text-shadow:0 0 4px #00f9ff; }
-    .stButton>button, .stDownloadButton>button {
-        background: linear-gradient(90deg, #00f0ff, #0066ff);
-        color:#02121b;
-        border-radius:10px;padding:8px 14px;
-        font-weight:700;font-family:'Orbitron', monospace;
-        box-shadow:0 8px 24px rgba(0,120,255,0.12);
-        transition: transform .15s ease, box-shadow .15s ease;
-    }
-    .stButton>button:hover, .stDownloadButton>button:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(0,120,255,0.2); }
-    [data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(4,6,20,0.95), rgba(8,12,35,0.95)); color:#EAF9FF; }
-    pre, code { background: rgba(0,20,40,0.4); color: #00f9ff; text-shadow:0 0 4px #00f9ff; }
+    body, [data-testid="stAppViewContainer"] { background-color:#0a0b1c; color:#00f9ff; font-family:'Orbitron','Trebuchet MS',monospace; text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff; overflow-x:hidden;}
+    h1,h2,h3,h4,h5,h6{color:#00f9ff !important;text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff,0 0 24px #00aaff;}
+    p,div,span,label{color:#a0f0ff !important;text-shadow:0 0 4px #00f9ff;}
+    .stButton>button,.stDownloadButton>button{background:linear-gradient(90deg,#00f0ff,#0066ff);color:#02121b;border-radius:10px;padding:8px 14px;font-weight:700;font-family:'Orbitron',monospace;box-shadow:0 8px 24px rgba(0,120,255,0.12);transition: transform .15s ease, box-shadow .15s ease;}
+    .stButton>button:hover,.stDownloadButton>button:hover{transform:translateY(-3px);box-shadow:0 16px 36px rgba(0,120,255,0.2);}
+    [data-testid="stSidebar"]{background:linear-gradient(180deg, rgba(4,6,20,0.95), rgba(8,12,35,0.95)); color:#EAF9FF;}
+    pre, code{background:rgba(0,20,40,0.4); color:#00f9ff; text-shadow:0 0 4px #00f9ff;}
     </style>
     """
     st.markdown(canvas_html, unsafe_allow_html=True)
 
 # =============================
-# Utilities: sentence splitting and improved summaries
+# Utilities for sentence splitting and summaries
 # =============================
-STOPWORDS = set(
-    "a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split()
-)
+STOPWORDS = set("a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split())
 
 def safe_sentence_split(text: str):
     pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
@@ -391,8 +381,7 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     sentences = []
     for para in paragraphs:
         sentences.extend(safe_sentence_split(para))
-    if not sentences:
-        return text
+    if not sentences: return text
 
     word_freq = Counter()
     for s in sentences:
@@ -400,199 +389,198 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         for w in words:
             if w not in STOPWORDS and len(w) > 2:
                 word_freq[w] += 1
-    if not word_freq:
-        return " ".join(sentences[:max_sentences])
+    if not word_freq: return " ".join(sentences[:max_sentences])
 
     max_freq = max(word_freq.values())
-    for w in list(word_freq.keys()):
-        word_freq[w] /= max_freq
+    for w in list(word_freq.keys()): word_freq[w] /= max_freq
 
     scored = []
     for idx, s in enumerate(sentences):
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
         score = sum(word_freq.get(w, 0.0) for w in words)
-        length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20) / 20)
+        length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20)/20)
         position_boost = 1.1 if idx < 3 else 1.0
-        scored.append((score / length_penalty * position_boost, idx, s))
+        scored.append((score/length_penalty*position_boost, idx, s))
 
-    scored.sort(key=lambda x: (-x[0], x[1]))
-    top = sorted(scored[:max_sentences], key=lambda x: x[1])
-    if as_bullets:
-        return "\n".join([f"- {s}" for _, _, s in top])
-    return " ".join([s for _, _, s in top])
+    scored.sort(key=lambda x:(-x[0], x[1]))
+    top = sorted(scored[:max_sentences], key=lambda x:x[1])
+    if as_bullets: return "\n".join([f"- {s}" for _,_,s in top])
+    return " ".join([s for _,_,s in top])
+
+def paragraph_summary(text: str, max_sentences: int = 5):
+    return summarize_text_advanced(text, max_sentences=max_sentences, as_bullets=False)
 
 # =============================
-# Python code analyzer and summarizer
+# Python code analyzer with error spotting & fixes
 # =============================
 def analyze_python(code: str, summary_length: int = 5):
-    report = {
-        "functions": [],
-        "classes": [],
-        "imports": [],
-        "purpose_summary": "",
-        "errors": [],
-        "warnings": [],
-        "suggestions": [],
-        "fixes": []
-    }
+    report = {"functions":[], "classes":[], "imports":[], "purpose_summary":"", "errors":[], "warnings":[], "suggestions":[], "fixes":[]}
 
+    # Quick scan
     for line in code.splitlines():
         l = line.strip()
-        if l.startswith("def "):
-            report["functions"].append(l.split("(")[0][4:].strip())
-        elif l.startswith("class "):
-            report["classes"].append(l.split("(")[0][6:].strip().rstrip(":"))
-        elif l.startswith("import ") or l.startswith("from "):
-            report["imports"].append(l)
+        if l.startswith("def "): report["functions"].append(l.split("(")[0][4:].strip())
+        elif l.startswith("class "): report["classes"].append(l.split("(")[0][6:].strip().rstrip(":"))
+        elif l.startswith("import ") or l.startswith("from "): report["imports"].append(l)
 
     report["purpose_summary"] = summarize_code_purpose(code, max_items=summary_length)
+
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
+        report["suggestions"].append("Check indentation, missing colons, parentheses, or quotes.")
+        report["fixes"].append("Correct the syntax at the reported line; ensure matching brackets/quotes and proper indentation.")
+        return report
+
+    imported_names, used_names, assigned_names, function_defs, class_defs = set(), set(), set(), [], []
+
+    class Analyzer(ast.NodeVisitor):
+        def visit_Import(self, node):
+            for alias in node.names: imported_names.add(alias.asname or alias.name.split(".")[0])
+            self.generic_visit(node)
+        def visit_ImportFrom(self, node):
+            for alias in node.names: imported_names.add(alias.asname or alias.name)
+            self.generic_visit(node)
+        def visit_FunctionDef(self, node):
+            function_defs.append(node)
+            assigned_names.add(node.name)
+            for default in node.args.defaults:
+                if isinstance(default,(ast.List,ast.Dict,ast.Set)):
+                    report["warnings"].append(f"Mutable default argument in '{node.name}' at line {node.lineno}")
+                    report["fixes"].append(f"Use None as default and initialize inside '{node.name}'")
+            self.generic_visit(node)
+        def visit_ClassDef(self, node):
+            class_defs.append(node)
+            assigned_names.add(node.name)
+            self.generic_visit(node)
+        def visit_Name(self, node):
+            if isinstance(node.ctx, ast.Load): used_names.add(node.id)
+            if isinstance(node.ctx, ast.Store): assigned_names.add(node.id)
+            self.generic_visit(node)
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Name) and node.func.id in {"eval","exec"}:
+                report["warnings"].append(f"Use of {node.func.id} detected at line {node.lineno}")
+                report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
+            self.generic_visit(node)
+        def visit_ExceptHandler(self,node):
+            if node.type is None:
+                report["warnings"].append(f"Bare except at line {node.lineno}")
+                report["fixes"].append("Catch specific exception types")
+            elif isinstance(node.type, ast.Name) and node.type.id in {"Exception","BaseException"}:
+                report["warnings"].append(f"Broad except '{node.type.id}' at line {node.lineno}")
+                report["fixes"].append("Catch narrower exception type")
+            if len(node.body)==1 and isinstance(node.body[0],ast.Pass):
+                report["warnings"].append(f"Exception swallowed with pass at line {node.lineno}")
+                report["fixes"].append("Handle or log exception instead of pass")
+            self.generic_visit(node)
+
+    Analyzer().visit(tree)
+
+    for name in imported_names:
+        if name not in used_names and name!="__future__":
+            report["warnings"].append(f"Possibly unused import '{name}'")
+            report["fixes"].append(f"Remove unused import '{name}'")
+    for name in assigned_names:
+        if name in dir(__builtins__):
+            report["warnings"].append(f"Variable/function '{name}' shadows builtin")
+            report["fixes"].append(f"Rename '{name}' to avoid shadowing")
+
+    # Missing docstrings
+    if ast.get_docstring(tree) is None:
+        report["warnings"].append("Module missing top-level docstring")
+        report["fixes"].append("Add a brief module docstring describing purpose")
+    for fn in function_defs:
+        if ast.get_docstring(fn) is None:
+            report["warnings"].append(f"Function '{fn.name}' missing docstring")
+            report["fixes"].append(f"Add concise docstring for '{fn.name}'")
+    for cl in class_defs:
+        if ast.get_docstring(cl) is None:
+            report["warnings"].append(f"Class '{cl.name}' missing docstring")
+            report["fixes"].append(f"Add concise docstring for '{cl.name}'")
+
     return report
 
-def summarize_code_purpose(code: str, max_items: int = 5) -> str:
-    return summarize_text_advanced(code, max_sentences=max_items)
+def summarize_code_purpose(code: str, max_items: int=5) -> str:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return summarize_text_advanced(code,max_sentences=max_items)
+    lines=[]
+    mod_doc = ast.get_docstring(tree)
+    if mod_doc: lines.append(mod_doc.strip().splitlines()[0])
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            methods = [n.name for n in node.body if isinstance(n, ast.FunctionDef)]
+            doc = ast.get_docstring(node)
+            if doc: lines.append(f"Class {node.name}: {doc.strip().splitlines()[0]}")
+            else: lines.append(f"Class {node.name} with methods: {', '.join(methods[:6])}")
+        elif isinstance(node, ast.FunctionDef):
+            args = [a.arg for a in node.args.args]
+            doc = ast.get_docstring(node)
+            if doc: lines.append(f"Function {node.name}({', '.join(args)}): {doc.strip().splitlines()[0]}")
+            else: lines.append(f"Function {node.name}({', '.join(args)})")
+    if not lines: return summarize_text_advanced(code,max_sentences=max_items)
+    return " \n".join(lines[:max_items])
 
 # =============================
 # Heuristic AI-generated code detector
 # =============================
 def detect_ai_generated_code(code: str) -> dict:
-    features = {}
-    lines = code.splitlines()
+    lines = [ln for ln in code.splitlines()]
     code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
     comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
-
-    total = max(1, len(lines))
-    features["comment_density"] = len(comment_lines) / total
-
-    normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+    features = {}
+    total = max(1,len(lines))
+    features["comment_density"]=len(comment_lines)/total
+    normalized = [re.sub(r"\s+"," ",ln.strip()) for ln in code_lines]
     counts = Counter(normalized)
-    repeated = sum(c for c in counts.values() if c > 1)
-    features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
-
-    score = 20 * features["comment_density"] + 50 * features["repeated_line_ratio"]
-    score = min(100, score)
-
-    label = "Likely AI-generated" if score > 50 else "Likely human-written"
-
-    return {"score": round(score, 1), "label": label, "features": features}
-
-# =============================
-# URL fetching
-# =============================
-def fetch_from_url(url: str) -> str:
-    try:
-        resp = requests.get(url, timeout=12)
-        resp.raise_for_status()
-        ct = resp.headers.get("Content-Type", "")
-        if "text/plain" in ct or url.lower().endswith((".py", ".txt", ".md")):
-            return resp.text
-        if "text/html" in ct:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            for s in soup(["script", "style", "noscript"]):
-                s.extract()
-            return soup.get_text(separator="\n")
-        return resp.text
-    except Exception as e:
-        return f"❌ Error fetching URL: {str(e)}"
+    repeated = sum(c for c in counts.values() if c>1)
+    features["repeated_line_ratio"] = repeated/max(1,len(code_lines))
+    docstring_like = re.findall(r'\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\'',code,re.DOTALL)
+    features["docstring_usage"]=1 if docstring_like else 0
+    score = 0
+    if features["comment_density"]>0.2: score+=0.2
+    if features["repeated_line_ratio"]>0.05: score+=0.3
+    if features["docstring_usage"]==0: score+=0.2
+    if score>0.5: verdict="Likely AI-generated"
+    else: verdict="Likely Human-written"
+    features["score"]=round(score,2)
+    features["verdict"]=verdict
+    return features
 
 # =============================
-# Copy button
+# Streamlit UI
 # =============================
-def copy_button(label: str, text: str, key: str):
-    if text is None:
-        text = ""
-    b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
-    html_button = f"""
-        <button onclick="navigator.clipboard.writeText(atob('{b64}'))"
-                style="background:transparent;border:1px solid rgba(255,255,255,0.06);
-                       color: #EAF9FF;padding:8px 12px;border-radius:8px;cursor:pointer;
-                       font-weight:700;box-shadow:0 6px 18px rgba(0,120,255,0.06);">
-            📋 {label}
-        </button>
-    """
-    st.markdown(html_button, unsafe_allow_html=True)
+set_canvas_stars()
+st.title("🌌 Technova AI & Code Analyzer")
+st.subheader("Analyze Python Code for Errors, Style, & AI Likelihood")
 
-# =============================
-# Main app
-# =============================
-def main():
-    set_canvas_stars()
-    st.title("🌌 TechNova — Study & Code Assistant")
-    st.caption("Summarize documents, analyze Python code, detect AI-generated code — neon starry UI")
+code_input = st.text_area("Paste Python code here:", height=300)
+summary_len = st.slider("Summary max sentences", 3, 12, 5)
 
-    tab1, tab2, tab3 = st.tabs(["📄 Document Summarizer", "💻 Code Analyzer", "🌐 URL Fetch & Explain"])
+if st.button("Analyze Code") and code_input.strip():
+    report = analyze_python(code_input, summary_length=summary_len)
+    ai_report = detect_ai_generated_code(code_input)
 
-    with tab1:
-        st.subheader("Summarize Documents")
-        text_input = st.text_area("Paste text here:", height=200)
-        uploaded_file = st.file_uploader("Or upload a document (.txt, .md)", type=["txt", "md"])
-        length = st.slider("Summary length (sentences)", 1, 12, 5)
-        as_bullets = st.checkbox("Return bullet outline", value=False)
+    st.markdown("### ⚡ Summary")
+    with st.expander("Show Summary"):
+        st.code(report["purpose_summary"])
 
-        if st.button("Summarize Document"):
-            content = ""
-            if uploaded_file:
-                try:
-                    content = uploaded_file.read().decode("utf-8")
-                except Exception:
-                    content = uploaded_file.read().decode("latin-1")
-            elif text_input.strip():
-                content = text_input
-            if content:
-                summary = summarize_text_advanced(content, max_sentences=length, as_bullets=as_bullets)
-                with st.expander("📌 Summary", expanded=True):
-                    st.write(summary)
-                    copy_button("Copy Summary", summary, key="doc_copy")
-                    st.download_button("⬇️ Download Summary", summary, "document_summary.txt", mime="text/plain")
+    st.markdown("### 🛠️ Functions & Classes")
+    with st.expander("Show Functions & Classes"):
+        st.write("Functions:", report["functions"])
+        st.write("Classes:", report["classes"])
+        st.write("Imports:", report["imports"])
 
-    with tab2:
-        st.subheader("Analyze Python Code")
-        code_input = st.text_area("Paste Python code here:", height=220)
-        uploaded_code = st.file_uploader("Or upload a Python file (.py)", type=["py"])
-        length_code = st.slider("Code purpose summary length (items)", 1, 8, 4, key="code_len")
+    st.markdown("### ❌ Errors & Warnings")
+    with st.expander("Show Errors & Warnings"):
+        if report["errors"]: st.error("\n".join(report["errors"]))
+        if report["warnings"]: st.warning("\n".join(report["warnings"]))
+        if report["suggestions"]: st.info("Suggestions:\n"+"\n".join(report["suggestions"]))
+        if report["fixes"]: st.success("Possible Fixes:\n"+"\n".join(report["fixes"]))
 
-        if st.button("Analyze Code"):
-            code_str = ""
-            if uploaded_code:
-                try:
-                    code_str = uploaded_code.read().decode("utf-8")
-                except Exception:
-                    code_str = uploaded_code.read().decode("latin-1")
-            elif code_input.strip():
-                code_str = code_input
-            if code_str:
-                report = analyze_python(code_str, summary_length=length_code)
-                ai_det = detect_ai_generated_code(code_str)
+    st.markdown("### 🤖 AI Detection")
+    with st.expander("Show AI Detection"):
+        st.write(ai_report)
 
-                with st.expander("📊 Code Analysis Report", expanded=True):
-                    st.write(report)
-                    st.write("🤖 AI Detection:", ai_det)
-                    copy_button("Copy Report", str({"analysis": report, "ai_detection": ai_det}), key="code_copy")
-                    st.download_button("⬇️ Download Code Report", str({"analysis": report, "ai_detection": ai_det}), "code_analysis.txt", mime="text/plain")
-
-    with tab3:
-        st.subheader("Fetch, Summarize & Explain from URL")
-        url_input = st.text_input("Enter a URL:")
-
-        if st.button("Fetch & Analyze URL"):
-            if url_input.strip():
-                data = fetch_from_url(url_input.strip())
-                if data.startswith("❌ Error"):
-                    st.error(data)
-                else:
-                    is_code = url_input.strip().lower().endswith(".py") or ("def " in data or "class " in data)
-                    if is_code:
-                        report = analyze_python(data, summary_length=5)
-                        ai_det = detect_ai_generated_code(data)
-                        with st.expander("💻 URL Code Analysis", expanded=True):
-                            st.write({"analysis": report, "ai_detection": ai_det})
-                            copy_button("Copy Report", str({"analysis": report, "ai_detection": ai_det}), key="url_code_copy")
-                            st.download_button("⬇️ Download Code Report", str({"analysis": report, "ai_detection": ai_det}), "url_code_analysis.txt")
-                    else:
-                        summary = summarize_text_advanced(data, max_sentences=5, as_bullets=False)
-                        with st.expander("📌 URL Document Summary", expanded=True):
-                            st.write(summary)
-                            copy_button("Copy Summary", summary, key="url_summary_copy")
-                            st.download_button("⬇️ Download Summary", summary, "url_summary.txt")
-
-if __name__ == "__main__":
-    main()
