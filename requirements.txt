@@ -1,6 +1,6 @@
 streamlit
-beautifulsoup4
 requests
+beautifulsoup4
 lxml
 numpy
-Pillow
+pillow
