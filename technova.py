@@ -312,6 +312,8 @@
 
 
 
+
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -336,17 +338,18 @@ def set_canvas_stars():
     const numStars = 80;
     const stars = [];
     for(let i=0;i<numStars;i++){
-        stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*2+1,
-                    dx: (Math.random()-0.5)*0.3, dy: (Math.random()-0.5)*0.3, alpha: Math.random()});
+        stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*2+1, dx:(Math.random()-0.5)*0.3, dy:(Math.random()-0.5)*0.3, alpha: Math.random()});
     }
     function draw() {
-        ctx.fillStyle = '#0a0b1c'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#0a0b1c';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
         for(let s of stars){
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
             ctx.fillStyle = "rgba(0,255,255,"+s.alpha+")";
             ctx.fill();
-            s.x += s.dx; s.y += s.dy; s.alpha += (Math.random()-0.5)*0.02;
+            s.x += s.dx; s.y += s.dy;
+            s.alpha += (Math.random()-0.5)*0.02;
             if(s.alpha<0)s.alpha=0; if(s.alpha>1)s.alpha=1;
             if(s.x<0)s.x=canvas.width; if(s.x>canvas.width)s.x=0;
             if(s.y<0)s.y=canvas.height; if(s.y>canvas.height)s.y=0;
@@ -356,19 +359,19 @@ def set_canvas_stars():
     draw();
     </script>
     <style>
-    body, [data-testid="stAppViewContainer"] { background-color:#0a0b1c; color:#00f9ff; font-family:'Orbitron','Trebuchet MS',monospace; text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff; overflow-x:hidden;}
-    h1,h2,h3,h4,h5,h6{color:#00f9ff !important;text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff,0 0 24px #00aaff;}
-    p,div,span,label{color:#a0f0ff !important;text-shadow:0 0 4px #00f9ff;}
-    .stButton>button,.stDownloadButton>button{background:linear-gradient(90deg,#00f0ff,#0066ff);color:#02121b;border-radius:10px;padding:8px 14px;font-weight:700;font-family:'Orbitron',monospace;box-shadow:0 8px 24px rgba(0,120,255,0.12);transition: transform .15s ease, box-shadow .15s ease;}
-    .stButton>button:hover,.stDownloadButton>button:hover{transform:translateY(-3px);box-shadow:0 16px 36px rgba(0,120,255,0.2);}
-    [data-testid="stSidebar"]{background:linear-gradient(180deg, rgba(4,6,20,0.95), rgba(8,12,35,0.95)); color:#EAF9FF;}
-    pre, code{background:rgba(0,20,40,0.4); color:#00f9ff; text-shadow:0 0 4px #00f9ff;}
+    body, [data-testid="stAppViewContainer"] { background-color:#0a0b1c; color:#00f9ff; font-family:'Orbitron','Trebuchet MS',monospace; text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff; overflow-x:hidden; }
+    h1,h2,h3,h4,h5,h6 { color:#00f9ff !important; text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff,0 0 24px #00aaff; }
+    p,div,span,label { color:#a0f0ff !important; text-shadow:0 0 4px #00f9ff; }
+    .stButton>button, .stDownloadButton>button { background: linear-gradient(90deg,#00f0ff,#0066ff); color:#02121b; border-radius:10px; padding:8px 14px; font-weight:700; font-family:'Orbitron',monospace; box-shadow:0 8px 24px rgba(0,120,255,0.12); transition: transform .15s ease, box-shadow .15s ease; }
+    .stButton>button:hover, .stDownloadButton>button:hover { transform: translateY(-3px); box-shadow:0 16px 36px rgba(0,120,255,0.2); }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(4,6,20,0.95), rgba(8,12,35,0.95)); color:#EAF9FF; }
+    pre, code { background: rgba(0,20,40,0.4); color: #00f9ff; text-shadow:0 0 4px #00f9ff; }
     </style>
     """
     st.markdown(canvas_html, unsafe_allow_html=True)
 
 # =============================
-# Utilities for sentence splitting and summaries
+# Utilities for summarizing
 # =============================
 STOPWORDS = set("a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split())
 
@@ -381,206 +384,276 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     sentences = []
     for para in paragraphs:
         sentences.extend(safe_sentence_split(para))
-    if not sentences: return text
-
+    if not sentences:
+        return text
     word_freq = Counter()
     for s in sentences:
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
         for w in words:
-            if w not in STOPWORDS and len(w) > 2:
-                word_freq[w] += 1
-    if not word_freq: return " ".join(sentences[:max_sentences])
-
+            if w not in STOPWORDS and len(w)>2: word_freq[w]+=1
+    if not word_freq:
+        return " ".join(sentences[:max_sentences])
     max_freq = max(word_freq.values())
-    for w in list(word_freq.keys()): word_freq[w] /= max_freq
-
-    scored = []
-    for idx, s in enumerate(sentences):
+    for w in list(word_freq.keys()): word_freq[w]/=max_freq
+    scored=[]
+    for idx,s in enumerate(sentences):
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
-        score = sum(word_freq.get(w, 0.0) for w in words)
-        length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20)/20)
-        position_boost = 1.1 if idx < 3 else 1.0
-        scored.append((score/length_penalty*position_boost, idx, s))
-
-    scored.sort(key=lambda x:(-x[0], x[1]))
-    top = sorted(scored[:max_sentences], key=lambda x:x[1])
+        score=sum(word_freq.get(w,0.0) for w in words)
+        length_penalty=1.0+0.2*max(0,(len(words)-20)/20)
+        position_boost=1.1 if idx<3 else 1.0
+        scored.append((score/length_penalty*position_boost,idx,s))
+    scored.sort(key=lambda x:(-x[0],x[1]))
+    top=sorted(scored[:max_sentences], key=lambda x:x[1])
     if as_bullets: return "\n".join([f"- {s}" for _,_,s in top])
     return " ".join([s for _,_,s in top])
 
-def paragraph_summary(text: str, max_sentences: int = 5):
-    return summarize_text_advanced(text, max_sentences=max_sentences, as_bullets=False)
-
 # =============================
-# Python code analyzer with error spotting & fixes
+# Python code analyzer
 # =============================
-def analyze_python(code: str, summary_length: int = 5):
-    report = {"functions":[], "classes":[], "imports":[], "purpose_summary":"", "errors":[], "warnings":[], "suggestions":[], "fixes":[]}
-
-    # Quick scan
+def analyze_python(code:str, summary_length:int=5):
+    report = {"functions":[],"classes":[],"imports":[],"purpose_summary":"","errors":[],"warnings":[],"suggestions":[],"fixes":[]}
     for line in code.splitlines():
-        l = line.strip()
+        l=line.strip()
         if l.startswith("def "): report["functions"].append(l.split("(")[0][4:].strip())
         elif l.startswith("class "): report["classes"].append(l.split("(")[0][6:].strip().rstrip(":"))
         elif l.startswith("import ") or l.startswith("from "): report["imports"].append(l)
-
-    report["purpose_summary"] = summarize_code_purpose(code, max_items=summary_length)
-
-    try:
-        tree = ast.parse(code)
+    report["purpose_summary"]=summarize_code_purpose(code, max_items=summary_length)
+    try: tree=ast.parse(code)
     except SyntaxError as e:
         report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
         report["suggestions"].append("Check indentation, missing colons, parentheses, or quotes.")
-        report["fixes"].append("Correct the syntax at the reported line; ensure matching brackets/quotes and proper indentation.")
+        report["fixes"].append("Fix the syntax at the reported line; ensure matching brackets/quotes and proper indentation.")
         return report
-
-    imported_names, used_names, assigned_names, function_defs, class_defs = set(), set(), set(), [], []
-
+    imported_names=set()
+    used_names=set()
+    assigned_names=set()
+    function_defs=[]
+    class_defs=[]
     class Analyzer(ast.NodeVisitor):
-        def visit_Import(self, node):
+        def visit_Import(self,node):
             for alias in node.names: imported_names.add(alias.asname or alias.name.split(".")[0])
             self.generic_visit(node)
-        def visit_ImportFrom(self, node):
+        def visit_ImportFrom(self,node):
             for alias in node.names: imported_names.add(alias.asname or alias.name)
             self.generic_visit(node)
-        def visit_FunctionDef(self, node):
+        def visit_FunctionDef(self,node):
             function_defs.append(node)
             assigned_names.add(node.name)
             for default in node.args.defaults:
                 if isinstance(default,(ast.List,ast.Dict,ast.Set)):
-                    report["warnings"].append(f"Mutable default argument in '{node.name}' at line {node.lineno}")
-                    report["fixes"].append(f"Use None as default and initialize inside '{node.name}'")
+                    report["warnings"].append(f"Mutable default argument in function '{node.name}' at line {node.lineno}")
+                    report["fixes"].append(f"Use None as default for mutable types in '{node.name}' and create new objects inside the function.")
             self.generic_visit(node)
-        def visit_ClassDef(self, node):
+        def visit_ClassDef(self,node):
             class_defs.append(node)
             assigned_names.add(node.name)
             self.generic_visit(node)
-        def visit_Name(self, node):
-            if isinstance(node.ctx, ast.Load): used_names.add(node.id)
-            if isinstance(node.ctx, ast.Store): assigned_names.add(node.id)
+        def visit_Name(self,node):
+            if isinstance(node.ctx,ast.Load): used_names.add(node.id)
+            if isinstance(node.ctx,ast.Store): assigned_names.add(node.id)
             self.generic_visit(node)
-        def visit_Call(self, node):
-            if isinstance(node.func, ast.Name) and node.func.id in {"eval","exec"}:
+        def visit_Call(self,node):
+            if isinstance(node.func,ast.Name) and node.func.id in {"eval","exec"}:
                 report["warnings"].append(f"Use of {node.func.id} detected at line {node.lineno}")
-                report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
+                report["fixes"].append(f"Avoid {node.func.id}; consider safer alternatives or explicit parsing.")
             self.generic_visit(node)
         def visit_ExceptHandler(self,node):
             if node.type is None:
-                report["warnings"].append(f"Bare except at line {node.lineno}")
-                report["fixes"].append("Catch specific exception types")
-            elif isinstance(node.type, ast.Name) and node.type.id in {"Exception","BaseException"}:
-                report["warnings"].append(f"Broad except '{node.type.id}' at line {node.lineno}")
-                report["fixes"].append("Catch narrower exception type")
+                report["warnings"].append(f"Bare except detected at line {node.lineno}")
+                report["fixes"].append("Catch specific exception classes instead of a bare except.")
+            elif isinstance(node.type,ast.Name) and node.type.id in {"Exception","BaseException"}:
+                report["warnings"].append(f"Overly broad exception handler '{node.type.id}' at line {node.lineno}")
+                report["fixes"].append("Catch the narrowest relevant exception type.")
             if len(node.body)==1 and isinstance(node.body[0],ast.Pass):
                 report["warnings"].append(f"Exception swallowed with pass at line {node.lineno}")
-                report["fixes"].append("Handle or log exception instead of pass")
+                report["fixes"].append("Handle the exception or log it; avoid silent failures.")
             self.generic_visit(node)
-
     Analyzer().visit(tree)
-
-    for name in imported_names:
-        if name not in used_names and name!="__future__":
+    for name in sorted(imported_names):
+        if name not in used_names and name not in {"__future__"}:
             report["warnings"].append(f"Possibly unused import '{name}'")
-            report["fixes"].append(f"Remove unused import '{name}'")
+            report["fixes"].append(f"Remove the unused import '{name}'.")
     for name in assigned_names:
         if name in dir(__builtins__):
-            report["warnings"].append(f"Variable/function '{name}' shadows builtin")
-            report["fixes"].append(f"Rename '{name}' to avoid shadowing")
-
-    # Missing docstrings
+            report["warnings"].append(f"Variable or function '{name}' shadows built-in")
+            report["fixes"].append(f"Rename '{name}' to avoid shadowing built-ins.")
+    for fn in function_defs:
+        seen_terminator=False
+        for node in fn.body:
+            if seen_terminator:
+                report["warnings"].append(f"Unreachable code in function '{fn.name}' after a return/raise at line {getattr(node,'lineno','?')}")
+                report["fixes"].append(f"Remove or refactor unreachable code in '{fn.name}'.")
+                break
+            if isinstance(node,(ast.Return,ast.Raise)): seen_terminator=True
     if ast.get_docstring(tree) is None:
-        report["warnings"].append("Module missing top-level docstring")
-        report["fixes"].append("Add a brief module docstring describing purpose")
+        report["warnings"].append("Module is missing a top-level docstring")
+        report["fixes"].append("Add a brief module docstring describing purpose and usage.")
     for fn in function_defs:
         if ast.get_docstring(fn) is None:
-            report["warnings"].append(f"Function '{fn.name}' missing docstring")
-            report["fixes"].append(f"Add concise docstring for '{fn.name}'")
+            report["warnings"].append(f"Function '{fn.name}' missing a docstring")
+            report["fixes"].append(f"Add a concise docstring for '{fn.name}'.")
     for cl in class_defs:
         if ast.get_docstring(cl) is None:
-            report["warnings"].append(f"Class '{cl.name}' missing docstring")
-            report["fixes"].append(f"Add concise docstring for '{cl.name}'")
-
+            report["warnings"].append(f"Class '{cl.name}' missing a docstring")
+            report["fixes"].append(f"Add a concise docstring for class '{cl.name}'.")
+    defined={fn.name for fn in function_defs}|{cl.name for cl in class_defs}
+    called=set()
+    class CallVisitor(ast.NodeVisitor):
+        def visit_Call(self,node):
+            if isinstance(node.func,ast.Name): called.add(node.func.id)
+            self.generic_visit(node)
+    CallVisitor().visit(tree)
+    for func in sorted(called):
+        if func not in defined and func not in dir(__builtins__):
+            report["warnings"].append(f"Call to undefined function '{func}' detected")
+            report["fixes"].append(f"Define '{func}' or import it before use.")
+    if not report["errors"]:
+        if report["warnings"]: report["suggestions"].append("Review warnings and apply the proposed fixes.")
+        else: report["suggestions"].append("No obvious issues; add tests and run linters for confidence.")
     return report
 
-def summarize_code_purpose(code: str, max_items: int=5) -> str:
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return summarize_text_advanced(code,max_sentences=max_items)
+def summarize_code_purpose(code:str, max_items:int=5)->str:
+    try: tree=ast.parse(code)
+    except SyntaxError: return summarize_text_advanced(code, max_sentences=max_items)
     lines=[]
-    mod_doc = ast.get_docstring(tree)
+    mod_doc=ast.get_docstring(tree)
     if mod_doc: lines.append(mod_doc.strip().splitlines()[0])
     for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            methods = [n.name for n in node.body if isinstance(n, ast.FunctionDef)]
-            doc = ast.get_docstring(node)
+        if isinstance(node,ast.ClassDef):
+            methods=[n.name for n in node.body if isinstance(n,ast.FunctionDef)]
+            doc=ast.get_docstring(node)
             if doc: lines.append(f"Class {node.name}: {doc.strip().splitlines()[0]}")
             else: lines.append(f"Class {node.name} with methods: {', '.join(methods[:6])}")
-        elif isinstance(node, ast.FunctionDef):
-            args = [a.arg for a in node.args.args]
-            doc = ast.get_docstring(node)
+        elif isinstance(node,ast.FunctionDef):
+            args=[a.arg for a in node.args.args]
+            doc=ast.get_docstring(node)
             if doc: lines.append(f"Function {node.name}({', '.join(args)}): {doc.strip().splitlines()[0]}")
             else: lines.append(f"Function {node.name}({', '.join(args)})")
-    if not lines: return summarize_text_advanced(code,max_sentences=max_items)
+    if not lines: return summarize_text_advanced(code, max_sentences=max_items)
     return " \n".join(lines[:max_items])
 
 # =============================
-# Heuristic AI-generated code detector
+# Heuristic AI detector
 # =============================
-def detect_ai_generated_code(code: str) -> dict:
-    lines = [ln for ln in code.splitlines()]
-    code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
-    comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
-    features = {}
-    total = max(1,len(lines))
+def detect_ai_generated_code(code:str)->dict:
+    lines=[ln for ln in code.splitlines()]
+    code_lines=[ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+    comment_lines=[ln for ln in lines if ln.strip().startswith("#")]
+    features={}
+    total=max(1,len(lines))
     features["comment_density"]=len(comment_lines)/total
-    normalized = [re.sub(r"\s+"," ",ln.strip()) for ln in code_lines]
-    counts = Counter(normalized)
-    repeated = sum(c for c in counts.values() if c>1)
-    features["repeated_line_ratio"] = repeated/max(1,len(code_lines))
-    docstring_like = re.findall(r'\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\'',code,re.DOTALL)
-    features["docstring_usage"]=1 if docstring_like else 0
-    score = 0
-    if features["comment_density"]>0.2: score+=0.2
-    if features["repeated_line_ratio"]>0.05: score+=0.3
-    if features["docstring_usage"]==0: score+=0.2
-    if score>0.5: verdict="Likely AI-generated"
-    else: verdict="Likely Human-written"
-    features["score"]=round(score,2)
-    features["verdict"]=verdict
-    return features
+    normalized=[re.sub(r"\s+"," ",ln.strip()) for ln in code_lines]
+    counts=Counter(normalized)
+    repeated=sum(c for c in counts.values() if c>1)
+    features["repeated_line_ratio"]=repeated/max(1,len(code_lines))
+    docstring_like=re.findall(r'\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\'',code,re.DOTALL)
+    docstrings=[d[0] or d[1] for d in docstring_like]
+    templated_docs=sum(1 for d in docstrings if re.match(r"(?i)\s*(this function|returns|parameters)\b",d.strip()))
+    features["templated_doc_ratio"]=(templated_docs/max(1,len(docstrings))) if docstrings else 0.0
+    generic_names={"data","result","results","temp","value","values","item","items","input","output","res"}
+    tokens=re.findall(r"[A-Za-z_][A-Za-z0-9_]*",code)
+    generic_count=sum(1 for t in tokens if t in generic_names)
+    features["generic_name_density"]=generic_count/max(1,len(tokens))
+    words=[w.lower() for w in re.findall(r"[A-Za-z0-9_']+",code)]
+    trigrams=[tuple(words[i:i+3]) for i in range(len(words)-2)]
+    trigram_counts=Counter(trigrams)
+    repeating_trigram_ratio=sum(1 for c in trigram_counts.values() if c>1)/max(1,len(trigram_counts))
+    features["repeating_trigram_ratio"]=repeating_trigram_ratio
+    score=(35*features["repeating_trigram_ratio"]+20*min(1.0,abs(features["comment_density"]-0.15)/0.15)+20*features["repeated_line_ratio"]+15*features["templated_doc_ratio"]+10*min(1.0,features["generic_name_density"]*20))
+    score=max(0.0,min(100.0,score))
+    label="Likely AI-generated" if score>=65 else "Unclear / Mixed" if score>=45 else "Likely human-written"
+    reasons=[]
+    if features["repeating_trigram_ratio"]>0.08: reasons.append("High repeated phrasing patterns across the code body.")
+    if features["repeated_line_ratio"]>0.06: reasons.append("Notable repetition of similar lines.")
+    if features["templated_doc_ratio"]>0.4: reasons.append("Docstrings appear templated.")
+    if features["comment_density"]<0.03 or features["comment_density"]>0.4: reasons.append("Atypical comment density.")
+    if features["generic_name_density"]>0.02: reasons.append("Frequent use of generic variable names.")
+    return {"score":round(score,1),"label":label,"reasons":reasons,"features":features}
 
 # =============================
-# Streamlit UI
+# Fetch from URL
 # =============================
-set_canvas_stars()
-st.title("🌌 Technova AI & Code Analyzer")
-st.subheader("Analyze Python Code for Errors, Style, & AI Likelihood")
+def fetch_from_url(url:str)->str:
+    try:
+        resp=requests.get(url,timeout=12)
+        resp.raise_for_status()
+        ct=resp.headers.get("Content-Type","")
+        if "text/plain" in ct or url.lower().endswith((".py",".txt",".md")): return resp.text
+        if "text/html" in ct:
+            soup=BeautifulSoup(resp.text,"html.parser")
+            for s in soup(["script","style","noscript"]): s.extract()
+            return soup.get_text(separator="\n")
+        return resp.text
+    except Exception as e: return f"❌ Error fetching URL: {str(e)}"
 
-code_input = st.text_area("Paste Python code here:", height=300)
-summary_len = st.slider("Summary max sentences", 3, 12, 5)
+# =============================
+# Copy button
+# =============================
+def copy_button(label:str,text:str,key:str):
+    if text is None: text=""
+    b64=base64.b64encode(text.encode("utf-8")).decode("ascii")
+    html_button=f"""
+        <button onclick="navigator.clipboard.writeText(atob('{b64}'))"
+                style="background:transparent;border:1px solid rgba(255,255,255,0.06);
+                       color: #EAF9FF;padding:8px 12px;border-radius:8px;cursor:pointer;
+                       font-weight:700;box-shadow:0 6px 18px rgba(0,120,255,0.06);">
+            📋 {label}
+        </button>
+    """
+    st.markdown(html_button, unsafe_allow_html=True)
 
-if st.button("Analyze Code") and code_input.strip():
-    report = analyze_python(code_input, summary_length=summary_len)
-    ai_report = detect_ai_generated_code(code_input)
+# =============================
+# Main App
+# =============================
+def main():
+    st.set_page_config(page_title="Technova AI Toolkit", layout="wide")
+    set_canvas_stars()
+    st.title("🌌 Technova AI Toolkit")
+    tab1, tab2, tab3, tab4 = st.tabs(["📄 Document Summarizer","💻 Code Analyzer","🌐 URL Fetch & Explain","🤖 AI vs Human Scanner"])
+    
+    with tab1:
+        st.subheader("Document Summarizer")
+        text_input = st.text_area("Paste your text here:",height=180)
+        if st.button("Summarize Document"):
+            summary = summarize_text_advanced(text_input, max_sentences=5, as_bullets=True)
+            with st.expander("📂 Summary (click to expand)"):
+                st.markdown(summary)
+    
+    with tab2:
+        st.subheader("Code Analyzer")
+        code_input = st.text_area("Paste Python code here:",height=180)
+        if st.button("Analyze Code"):
+            report = analyze_python(code_input)
+            with st.expander("📂 Code Summary / Purpose"):
+                st.markdown(report["purpose_summary"])
+            with st.expander("⚠️ Errors"):
+                for e in report["errors"]: st.markdown(f"- {e}")
+            with st.expander("⚠️ Warnings & Suggestions"):
+                for w in report["warnings"]: st.markdown(f"- {w}")
+            with st.expander("💡 Fixes / Recommendations"):
+                for f in report["fixes"]: st.markdown(f"- {f}")
+    
+    with tab3:
+        st.subheader("URL Fetch & Explain")
+        url_input = st.text_input("Enter URL to fetch content:")
+        if st.button("Fetch & Summarize URL"):
+            content = fetch_from_url(url_input)
+            summary = summarize_text_advanced(content, max_sentences=5, as_bullets=True)
+            with st.expander("📂 Fetched Content Summary"):
+                st.markdown(summary)
+    
+    with tab4:
+        st.subheader("AI vs Human Scanner (Text or Code)")
+        ai_input = st.text_area("Paste text or code here for AI vs Human detection:",height=180)
+        if st.button("Detect AI/ Human Likelihood"):
+            result = detect_ai_generated_code(ai_input)
+            with st.expander(f"📊 Likelihood: {result['label']} (Score: {result['score']}%)"):
+                st.markdown("**Reasons / Indicators:**")
+                for r in result["reasons"]: st.markdown(f"- {r}")
+                st.markdown("**Detailed Features:**")
+                for k,v in result["features"].items(): st.markdown(f"- {k}: {v}")
+    
+if __name__=="__main__":
+    main()
 
-    st.markdown("### ⚡ Summary")
-    with st.expander("Show Summary"):
-        st.code(report["purpose_summary"])
-
-    st.markdown("### 🛠️ Functions & Classes")
-    with st.expander("Show Functions & Classes"):
-        st.write("Functions:", report["functions"])
-        st.write("Classes:", report["classes"])
-        st.write("Imports:", report["imports"])
-
-    st.markdown("### ❌ Errors & Warnings")
-    with st.expander("Show Errors & Warnings"):
-        if report["errors"]: st.error("\n".join(report["errors"]))
-        if report["warnings"]: st.warning("\n".join(report["warnings"]))
-        if report["suggestions"]: st.info("Suggestions:\n"+"\n".join(report["suggestions"]))
-        if report["fixes"]: st.success("Possible Fixes:\n"+"\n".join(report["fixes"]))
-
-    st.markdown("### 🤖 AI Detection")
-    with st.expander("Show AI Detection"):
-        st.write(ai_report)
 
