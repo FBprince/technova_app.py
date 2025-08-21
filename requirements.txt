@@ -4,8 +4,11 @@ beautifulsoup4
 lxml
 pillow
 numpy
-altair
-
-
-
-
+opencv-python-headless
+scikit-learn
+joblib
+transformers
+torch
+spacy
+nltk
+tqdm
