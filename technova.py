@@ -310,6 +310,8 @@
 
 
 
+
+
 # technova_app.py
 import streamlit as st
 import requests
@@ -318,8 +320,13 @@ import re
 import base64
 import ast
 from collections import Counter
-import math
 import io
+
+# PDF extraction (PyPDF2)
+try:
+    import PyPDF2
+except Exception:
+    PyPDF2 = None
 
 # Page config
 st.set_page_config(page_title="Technova AI Toolkit", layout="wide")
@@ -329,15 +336,15 @@ st.set_page_config(page_title="Technova AI Toolkit", layout="wide")
 # ----------------------------
 def copy_button(text: str, label: str = "Copy", key: str = None):
     """
-    Renders a small button that copies `text` to the user's clipboard using JS.
-    key - unique identifier for the button element (string).
+    Renders a button that copies `text` to the user's clipboard using JS.
+    key - unique identifier for the button element.
     """
     if text is None:
         text = ""
     safe_b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
     el_id = f"copy-btn-{key}" if key else f"copy-btn-{abs(hash(text))}"
     html = f"""
-    <button id="{el_id}" onclick="navigator.clipboard.writeText(atob('{safe_b64}'))" 
+    <button id="{el_id}" onclick="navigator.clipboard.writeText(atob('{safe_b64}'))"
         style="background:transparent;border:1px solid rgba(255,255,255,0.06);
                color:#EAF9FF;padding:8px 12px;border-radius:8px;cursor:pointer;
                font-weight:700;margin-right:8px;">
@@ -346,15 +353,16 @@ def copy_button(text: str, label: str = "Copy", key: str = None):
     <script>
     const btn_{el_id} = document.getElementById('{el_id}');
     btn_{el_id}.addEventListener('click', () => {{
+      const old = btn_{el_id}.innerText;
       btn_{el_id}.innerText = '✅ Copied';
-      setTimeout(()=>{{ btn_{el_id}.innerText = '📋 {label}'; }}, 1400);
+      setTimeout(()=>{{ btn_{el_id}.innerText = old; }}, 1400);
     }});
     </script>
     """
     st.markdown(html, unsafe_allow_html=True)
 
 # ----------------------------
-# UI: Neon star background & styles
+# Neon star background & basic styles
 # ----------------------------
 def set_canvas_stars():
     canvas_html = """
@@ -368,24 +376,14 @@ def set_canvas_stars():
     const numStars = 80;
     const stars = [];
     for(let i=0;i<numStars;i++){
-      stars.push({
-        x: Math.random()*canvas.width,
-        y: Math.random()*canvas.height,
-        r: Math.random()*2+1,
-        dx: (Math.random()-0.5)*0.3,
-        dy: (Math.random()-0.5)*0.3,
-        alpha: Math.random()
-      });
+      stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,dx:(Math.random()-0.5)*0.3,dy:(Math.random()-0.5)*0.3,alpha:Math.random()});
     }
     function draw(){
       ctx.fillStyle='#0a0b1c'; ctx.fillRect(0,0,canvas.width,canvas.height);
       for(let s of stars){
-        ctx.beginPath();
-        ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-        ctx.fillStyle='rgba(0,255,255,'+s.alpha+')';
-        ctx.fill();
-        s.x += s.dx; s.y += s.dy;
-        s.alpha += (Math.random()-0.5)*0.02;
+        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+        ctx.fillStyle='rgba(0,255,255,'+s.alpha+')'; ctx.fill();
+        s.x+=s.dx; s.y+=s.dy; s.alpha+=(Math.random()-0.5)*0.02;
         if(s.alpha<0)s.alpha=0; if(s.alpha>1)s.alpha=1;
         if(s.x<0)s.x=canvas.width; if(s.x>canvas.width)s.x=0;
         if(s.y<0)s.y=canvas.height; if(s.y>canvas.height)s.y=0;
@@ -397,16 +395,10 @@ def set_canvas_stars():
     <style>
     body, [data-testid="stAppViewContainer"] {
       background-color:#0a0b1c; color:#00f9ff;
-      font-family:'Orbitron', 'Trebuchet MS', monospace;
-      text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff;
-      overflow-x:hidden;
+      font-family: 'Orbitron', 'Trebuchet MS', monospace;
+      text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff; overflow-x:hidden;
     }
-    h1,h2,h3,h4,h5,h6 { color:#00f9ff !important; text-shadow:0 0 6px #00f9ff,0 0 12px #00cfff,0 0 24px #00aaff; }
-    .stButton>button, .stDownloadButton>button {
-      background: linear-gradient(90deg,#00f0ff,#0066ff); color:#02121b;
-      border-radius:10px; padding:8px 14px; font-weight:700;
-      box-shadow:0 8px 24px rgba(0,120,255,0.12);
-    }
+    .stButton>button, .stDownloadButton>button { background: linear-gradient(90deg,#00f0ff,#0066ff); color:#02121b; border-radius:10px; padding:8px 14px; font-weight:700; }
     </style>
     """
     st.markdown(canvas_html, unsafe_allow_html=True)
@@ -416,7 +408,7 @@ st.title("🌌 Technova AI Toolkit")
 st.caption("Document summarizer • Code analyzer • AI vs Human scanner • URL fetcher — neon UI")
 
 # ----------------------------
-# Utilities: summarization helpers
+# Summarization helpers
 # ----------------------------
 STOPWORDS = set(
     "a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split()
@@ -462,18 +454,10 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     return " ".join([s for _, _, s in top])
 
 # ----------------------------
-# Code analysis with AST + fixes
+# Code analyzer (AST) with fixes
 # ----------------------------
 def analyze_python(code: str):
-    report = {
-        "functions": [],
-        "classes": [],
-        "imports": [],
-        "purpose_summary": "",
-        "errors": [],
-        "warnings": [],
-        "fixes": []
-    }
+    report = {"functions": [], "classes": [], "imports": [], "purpose_summary": "", "errors": [], "warnings": [], "fixes": []}
 
     for line in code.splitlines():
         l = line.strip()
@@ -561,7 +545,7 @@ def analyze_python(code: str):
             report["warnings"].append(f"Variable or function '{name}' shadows built-in")
             report["fixes"].append(f"Rename '{name}' to avoid shadowing built-ins.")
 
-    # Unreachable code detection (simple)
+    # Simple unreachable code detection
     for fn in function_defs:
         seen_terminator = False
         for node in fn.body:
@@ -572,7 +556,7 @@ def analyze_python(code: str):
             if isinstance(node, (ast.Return, ast.Raise)):
                 seen_terminator = True
 
-    # Docstrings checks
+    # Docstrings
     if ast.get_docstring(tree) is None:
         report["warnings"].append("Module is missing a top-level docstring")
         report["fixes"].append("Add a brief module docstring describing purpose and usage.")
@@ -585,7 +569,7 @@ def analyze_python(code: str):
             report["warnings"].append(f"Class '{cl.name}' missing a docstring")
             report["fixes"].append(f"Add a concise docstring for class '{cl.name}'.")
 
-    # Call to undefined simple functions
+    # Undefined function calls (simple)
     defined = {fn.name for fn in function_defs} | {cl.name for cl in class_defs}
     called = set()
     class CallVisitor(ast.NodeVisitor):
@@ -608,54 +592,46 @@ def analyze_python(code: str):
     return report
 
 # ----------------------------
-# Heuristic AI-generated code/text detector
+# Heuristic AI detector (works for text/code)
 # ----------------------------
 def detect_ai_generated_code(code: str) -> dict:
     lines = [ln for ln in code.splitlines()]
     code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
     comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
-
     features = {}
     total = max(1, len(lines))
     features["comment_density"] = len(comment_lines) / total
-
     normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
     counts = Counter(normalized)
     repeated = sum(c for c in counts.values() if c > 1)
     features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
-
     docstring_like = re.findall(r'\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\'', code, flags=re.S)
     docstrings = [d[0] or d[1] for d in docstring_like]
     templated_docs = sum(1 for d in docstrings if re.match(r"(?i)\s*(this function|returns|parameters)\b", d.strip()))
     features["templated_doc_ratio"] = (templated_docs / max(1, len(docstrings))) if docstrings else 0.0
-
     generic_names = {"data", "result", "results", "temp", "value", "values", "item", "items", "input", "output", "res"}
     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
     generic_count = sum(1 for t in tokens if t in generic_names)
-    features["generic_name_density"] = generic_count / max(1, len(tokens))
-
+    features["generic_name_density"] = generic_count / max(1, len(tokens)) if tokens else 0.0
     words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", code)]
-    trigrams = [tuple(words[i:i+3]) for i in range(len(words)-2)]
+    trigrams = [tuple(words[i:i+3]) for i in range(len(words) - 2)]
     trigram_counts = Counter(trigrams)
-    repeating_trigram_ratio = sum(1 for c in trigram_counts.values() if c > 1) / max(1, len(trigram_counts))
+    repeating_trigram_ratio = sum(1 for c in trigram_counts.values() if c > 1) / max(1, len(trigram_counts)) if trigram_counts else 0.0
     features["repeating_trigram_ratio"] = repeating_trigram_ratio
-
     score = (
-        35 * features["repeating_trigram_ratio"] +
-        20 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15) +
-        20 * features["repeated_line_ratio"] +
-        15 * features["templated_doc_ratio"] +
-        10 * min(1.0, features["generic_name_density"] * 20)
+        35 * features["repeating_trigram_ratio"]
+        + 20 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15)
+        + 20 * features["repeated_line_ratio"]
+        + 15 * features["templated_doc_ratio"]
+        + 10 * min(1.0, features["generic_name_density"] * 20)
     )
     score = max(0.0, min(100.0, score))
-
     if score >= 65:
         label = "Likely AI-generated"
     elif score >= 45:
         label = "Unclear / Mixed"
     else:
         label = "Likely human-written"
-
     reasons = []
     if features["repeating_trigram_ratio"] > 0.08:
         reasons.append("High repeated phrasing patterns.")
@@ -667,11 +643,10 @@ def detect_ai_generated_code(code: str) -> dict:
         reasons.append("Atypical comment density.")
     if features["generic_name_density"] > 0.02:
         reasons.append("Frequent use of generic variable names.")
-
     return {"score": round(score, 1), "label": label, "reasons": reasons, "features": features}
 
 # ----------------------------
-# Fetch from URL helper
+# Fetch from URL
 # ----------------------------
 def fetch_from_url(url: str) -> str:
     try:
@@ -688,15 +663,15 @@ def fetch_from_url(url: str) -> str:
         return f"❌ Error fetching URL: {str(e)}"
 
 # ----------------------------
-# Tabs UI (unique keys everywhere)
+# Tabs (unique keys for all widgets)
 # ----------------------------
 tabs = st.tabs(["Document Summarizer", "Code Analyzer", "AI vs Human Scanner", "URL Fetch & Explain"])
 
-# --- Document Summarizer Tab ---
+# Document Summarizer tab
 with tabs[0]:
     st.header("📄 Document Summarizer")
     doc_text = st.text_area("Paste text", key="doc_text_input")
-    doc_file = st.file_uploader("Upload text file (.txt, .md)", type=["txt", "md"], key="doc_file_upload")
+    doc_file = st.file_uploader("Upload a file (.txt, .md, .pdf)", type=["txt", "md", "pdf"], key="doc_file_upload")
     doc_url = st.text_input("Or enter URL to fetch content", key="doc_url_input")
     doc_len = st.slider("Summary length (sentences)", 1, 12, 5, key="doc_summary_len")
     doc_bullets = st.checkbox("Return bullets", value=False, key="doc_as_bullets")
@@ -704,10 +679,25 @@ with tabs[0]:
     if st.button("Summarize Document", key="doc_summarize_btn"):
         content = ""
         if doc_file:
-            try:
-                content = doc_file.read().decode("utf-8", errors="ignore")
-            except Exception:
-                content = doc_file.read().decode("latin-1", errors="ignore")
+            fn = getattr(doc_file, "name", "")
+            if fn.lower().endswith(".pdf"):
+                if PyPDF2 is None:
+                    st.error("PDF support requires PyPDF2. Install it with 'pip install PyPDF2'.")
+                else:
+                    try:
+                        reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
+                        pages_text = []
+                        for p in reader.pages:
+                            pages_text.append(p.extract_text() or "")
+                        content = "\n".join(pages_text)
+                    except Exception as e:
+                        st.error(f"Failed to extract PDF text: {e}")
+                        content = ""
+            else:
+                try:
+                    content = doc_file.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    content = doc_file.read().decode("latin-1", errors="ignore")
         elif doc_url.strip():
             content = fetch_from_url(doc_url.strip())
         elif doc_text.strip():
@@ -722,11 +712,11 @@ with tabs[0]:
                     st.markdown(summary)
                 else:
                     st.write(summary)
-                # Copy & Download
+                # copy + download
                 copy_button(summary, label="Copy Summary", key="doc_summary_copy")
                 st.download_button("⬇ Download Summary", summary.encode("utf-8"), "document_summary.txt", key="doc_summary_download")
 
-# --- Code Analyzer Tab ---
+# Code Analyzer tab
 with tabs[1]:
     st.header("💻 Code Analyzer")
     code_text = st.text_area("Paste Python code", key="code_text_input")
@@ -749,7 +739,12 @@ with tabs[1]:
         if not code_str:
             st.warning("Please paste code, upload a file, or enter a URL.")
         else:
+            # show syntax highlighted preview
+            with st.expander("💻 Code Preview (syntax-highlighted)", expanded=False):
+                st.code(code_str, language="python")
+
             report = analyze_python(code_str)
+
             with st.expander("📂 Code Purpose Summary", expanded=True):
                 st.write(report["purpose_summary"])
                 copy_button(report["purpose_summary"], label="Copy Summary", key="code_purpose_copy")
@@ -776,25 +771,39 @@ with tabs[1]:
                 else:
                     st.write("_No fixes suggested_")
 
-            # full report download & copy
             copy_button(str(report), label="Copy Full Report", key="code_full_report_copy")
             st.download_button("⬇ Download Full Report", str(report).encode("utf-8"), "code_analysis_report.txt", key="code_full_report_download")
 
-# --- AI vs Human Scanner Tab ---
+# AI vs Human Scanner tab
 with tabs[2]:
     st.header("🤖 AI vs Human Scanner")
     ai_text = st.text_area("Paste text or code", key="ai_text_input")
-    ai_file = st.file_uploader("Upload file (.txt, .md, .py)", type=["txt", "md", "py"], key="ai_file_upload")
+    ai_file = st.file_uploader("Upload file (.txt, .md, .py, .pdf)", type=["txt", "md", "py", "pdf"], key="ai_file_upload")
     ai_url = st.text_input("Or enter URL to fetch content", key="ai_url_input")
     ai_mode = st.radio("Content type", ["Auto-detect", "Treat as Text", "Treat as Code"], index=0, key="ai_mode_radio")
 
     if st.button("Detect AI / Human Likelihood", key="ai_detect_btn"):
         content = ""
         if ai_file:
-            try:
-                content = ai_file.read().decode("utf-8", errors="ignore")
-            except Exception:
-                content = ai_file.read().decode("latin-1", errors="ignore")
+            fn = getattr(ai_file, "name", "")
+            if fn.lower().endswith(".pdf"):
+                if PyPDF2 is None:
+                    st.error("PDF support requires PyPDF2. Install it with 'pip install PyPDF2'.")
+                else:
+                    try:
+                        reader = PyPDF2.PdfReader(io.BytesIO(ai_file.read()))
+                        pages_text = []
+                        for p in reader.pages:
+                            pages_text.append(p.extract_text() or "")
+                        content = "\n".join(pages_text)
+                    except Exception as e:
+                        st.error(f"Failed to extract PDF text: {e}")
+                        content = ""
+            else:
+                try:
+                    content = ai_file.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    content = ai_file.read().decode("latin-1", errors="ignore")
         elif ai_url.strip():
             content = fetch_from_url(ai_url.strip())
         elif ai_text.strip():
@@ -803,7 +812,6 @@ with tabs[2]:
         if not content:
             st.warning("Please paste content, upload a file, or enter a URL.")
         else:
-            # For code vs text we can pass through same detector — it works for both
             result = detect_ai_generated_code(content)
             header = f"📊 Likelihood: {result['label']} (Score: {result['score']}%)"
             with st.expander(header, expanded=True):
@@ -817,11 +825,10 @@ with tabs[2]:
                 for k, v in result["features"].items():
                     st.markdown(f"- {k}: {v}")
 
-                # copy & download
                 copy_button(str(result), label="Copy AI Result", key="ai_result_copy")
                 st.download_button("⬇ Download AI Result", str(result).encode("utf-8"), "ai_result.txt", key="ai_result_download")
 
-# --- URL Fetch & Explain Tab ---
+# URL Fetch & Explain tab
 with tabs[3]:
     st.header("🌐 URL Fetch & Explain")
     url_input = st.text_input("Enter any URL to fetch content", key="url_fetch_input")
@@ -846,4 +853,3 @@ with tabs[3]:
                         st.write(summary)
                     copy_button(summary, label="Copy Summary", key="url_summary_copy")
                     st.download_button("⬇ Download Summary", summary.encode("utf-8"), "url_summary.txt", key="url_summary_download")
-
