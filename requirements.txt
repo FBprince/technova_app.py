@@ -4,6 +4,8 @@ beautifulsoup4
 lxml
 pillow
 numpy
-astpretty
+altair
+
+
 
 
