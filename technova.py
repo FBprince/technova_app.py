@@ -302,25 +302,14 @@
 
 
 
-
-
-
-
-
-
-
-
-# CODE 2
-
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import re
 import base64
 import ast
-from collections import Counter, defaultdict
-import math
+from collections import Counter
+import math  # ✅ Added math module
 
 # =============================
 # 🌌 Canvas Star Background + Neon Text
@@ -331,23 +320,14 @@ def set_canvas_stars():
     <script>
     const canvas = document.getElementById('star-canvas');
     const ctx = canvas.getContext('2d');
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize);
     resize();
     const numStars = 80;
     const stars = [];
     for(let i=0;i<numStars;i++){
-        stars.push({
-            x: Math.random()*canvas.width,
-            y: Math.random()*canvas.height,
-            r: Math.random()*2+1,
-            dx: (Math.random()-0.5)*0.3,
-            dy: (Math.random()-0.5)*0.3,
-            alpha: Math.random()
-        });
+        stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*2+1,
+                    dx: (Math.random()-0.5)*0.3, dy: (Math.random()-0.5)*0.3, alpha: Math.random()});
     }
     function draw() {
         ctx.fillStyle = '#0a0b1c';
@@ -357,8 +337,7 @@ def set_canvas_stars():
             ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
             ctx.fillStyle = "rgba(0,255,255,"+s.alpha+")";
             ctx.fill();
-            s.x += s.dx;
-            s.y += s.dy;
+            s.x += s.dx; s.y += s.dy;
             s.alpha += (Math.random()-0.5)*0.02;
             if(s.alpha<0)s.alpha=0;
             if(s.alpha>1)s.alpha=1;
@@ -395,7 +374,6 @@ def set_canvas_stars():
     </style>
     """
     st.markdown(canvas_html, unsafe_allow_html=True)
-
 
 # =============================
 # Utilities: sentence splitting and improved summaries
@@ -443,12 +421,8 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         return "\n".join([f"- {s}" for _, _, s in top])
     return " ".join([s for _, _, s in top])
 
-def paragraph_summary(text: str, max_sentences: int = 5):
-    return summarize_text_advanced(text, max_sentences=max_sentences, as_bullets=False)
-
-
 # =============================
-# Python code analyzer and summarizer with actionable fixes
+# Python code analyzer and summarizer
 # =============================
 def analyze_python(code: str, summary_length: int = 5):
     report = {
@@ -462,7 +436,6 @@ def analyze_python(code: str, summary_length: int = 5):
         "fixes": []
     }
 
-    # Quick structure scrape
     for line in code.splitlines():
         l = line.strip()
         if l.startswith("def "):
@@ -473,74 +446,34 @@ def analyze_python(code: str, summary_length: int = 5):
             report["imports"].append(l)
 
     report["purpose_summary"] = summarize_code_purpose(code, max_items=summary_length)
-
-    # Parse AST
-    try:
-        tree = ast.parse(code)
-    except SyntaxError as e:
-        report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
-        report["suggestions"].append("Check indentation, missing colons, parentheses, or quotes.")
-        report["fixes"].append("Fix the syntax at the reported line; ensure matching brackets/quotes and proper indentation.")
-        return report
-
-    # Analyzer visitor omitted for brevity (same as before)...
-
-    # Reusing your full AST Analyzer and AI detector code here
-    # For brevity in this snippet, assume `Analyzer().visit(tree)` is included and fully functional
-    # Similarly, assume warnings, errors, fixes, undefined calls, docstrings checks are included
-
-    # Ensure top-level docstring summary
-    if ast.get_docstring(tree) is None:
-        report["warnings"].append("Module is missing a top-level docstring")
-        report["fixes"].append("Add a brief module docstring describing purpose and usage.")
-
-    # ... Other analysis steps
-
     return report
 
 def summarize_code_purpose(code: str, max_items: int = 5) -> str:
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return summarize_text_advanced(code, max_sentences=max_items)
-
-    lines = []
-    mod_doc = ast.get_docstring(tree)
-    if mod_doc:
-        first = mod_doc.strip().splitlines()[0]
-        lines.append(first)
-
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            methods = [n.name for n in node.body if isinstance(n, ast.FunctionDef)]
-            doc = ast.get_docstring(node)
-            if doc:
-                first = doc.strip().splitlines()[0]
-                lines.append(f"Class {node.name}: {first}")
-            else:
-                lines.append(f"Class {node.name} with methods: {', '.join(methods[:6])}")
-        elif isinstance(node, ast.FunctionDef):
-            args = [a.arg for a in node.args.args]
-            doc = ast.get_docstring(node)
-            if doc:
-                first = doc.strip().splitlines()[0]
-                lines.append(f"Function {node.name}({', '.join(args)}): {first}")
-            else:
-                lines.append(f"Function {node.name}({', '.join(args)})")
-
-    if not lines:
-        return summarize_text_advanced(code, max_sentences=max_items)
-    return " \n".join(lines[:max_items])
-
+    return summarize_text_advanced(code, max_sentences=max_items)
 
 # =============================
 # Heuristic AI-generated code detector
 # =============================
 def detect_ai_generated_code(code: str) -> dict:
-    # Same code as before
-    # Calculate features, score, label, reasons
-    return {"score": 0.0, "label": "Likely human-written", "reasons": [], "features": {}}
+    features = {}
+    lines = code.splitlines()
+    code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+    comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
 
+    total = max(1, len(lines))
+    features["comment_density"] = len(comment_lines) / total
+
+    normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+    counts = Counter(normalized)
+    repeated = sum(c for c in counts.values() if c > 1)
+    features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
+
+    score = 20 * features["comment_density"] + 50 * features["repeated_line_ratio"]
+    score = min(100, score)
+
+    label = "Likely AI-generated" if score > 50 else "Likely human-written"
+
+    return {"score": round(score, 1), "label": label, "features": features}
 
 # =============================
 # URL fetching
@@ -561,7 +494,6 @@ def fetch_from_url(url: str) -> str:
     except Exception as e:
         return f"❌ Error fetching URL: {str(e)}"
 
-
 # =============================
 # Copy button
 # =============================
@@ -579,18 +511,16 @@ def copy_button(label: str, text: str, key: str):
     """
     st.markdown(html_button, unsafe_allow_html=True)
 
-
 # =============================
 # Main app
 # =============================
 def main():
     set_canvas_stars()
     st.title("🌌 TechNova — Study & Code Assistant")
-    st.caption("Summarize documents, analyze Python code with smart debugging, detect AI-generated code — neon starry UI")
+    st.caption("Summarize documents, analyze Python code, detect AI-generated code — neon starry UI")
 
     tab1, tab2, tab3 = st.tabs(["📄 Document Summarizer", "💻 Code Analyzer", "🌐 URL Fetch & Explain"])
 
-    # ----------------------------
     with tab1:
         st.subheader("Summarize Documents")
         text_input = st.text_area("Paste text here:", height=200)
@@ -607,21 +537,15 @@ def main():
                     content = uploaded_file.read().decode("latin-1")
             elif text_input.strip():
                 content = text_input
-            if not content:
-                st.warning("Paste text or upload a file.")
-            else:
+            if content:
                 summary = summarize_text_advanced(content, max_sentences=length, as_bullets=as_bullets)
-                with st.expander("📌 Summary (click to expand)"):
-                    if as_bullets:
-                        st.markdown(summary)
-                    else:
-                        st.write(summary)
+                with st.expander("📌 Summary", expanded=True):
+                    st.write(summary)
                     copy_button("Copy Summary", summary, key="doc_copy")
                     st.download_button("⬇️ Download Summary", summary, "document_summary.txt", mime="text/plain")
 
-    # ----------------------------
     with tab2:
-        st.subheader("Analyze Python Code with Smart Debugging + AI Detection")
+        st.subheader("Analyze Python Code")
         code_input = st.text_area("Paste Python code here:", height=220)
         uploaded_code = st.file_uploader("Or upload a Python file (.py)", type=["py"])
         length_code = st.slider("Code purpose summary length (items)", 1, 8, 4, key="code_len")
@@ -635,36 +559,22 @@ def main():
                     code_str = uploaded_code.read().decode("latin-1")
             elif code_input.strip():
                 code_str = code_input
-            if not code_str:
-                st.warning("Paste code or upload a Python file.")
-            else:
+            if code_str:
                 report = analyze_python(code_str, summary_length=length_code)
                 ai_det = detect_ai_generated_code(code_str)
 
-                with st.expander("📊 Code Analysis Report (click to expand)"):
-                    st.json(report)
-                    copy_button("Copy Code Analysis", str(report), key="code_report_copy")
-                    st.download_button("⬇️ Download Code Report", str(report), "code_analysis.txt", mime="text/plain")
+                with st.expander("📊 Code Analysis Report", expanded=True):
+                    st.write(report)
+                    st.write("🤖 AI Detection:", ai_det)
+                    copy_button("Copy Report", str({"analysis": report, "ai_detection": ai_det}), key="code_copy")
+                    st.download_button("⬇️ Download Code Report", str({"analysis": report, "ai_detection": ai_det}), "code_analysis.txt", mime="text/plain")
 
-                with st.expander("🤖 AI-Generated Code Detection (click to expand)"):
-                    st.metric(label="Likelihood Score (0-100)", value=ai_det["score"])
-                    st.write(f"Assessment: **{ai_det['label']}**")
-                    if ai_det["reasons"]:
-                        st.markdown("**Reasons:**")
-                        for r in ai_det["reasons"]:
-                            st.write(f"- {r}")
-                    copy_button("Copy AI Detection", str(ai_det), key="ai_det_copy")
-                    st.download_button("⬇️ Download AI Detection", str(ai_det), "ai_detection.txt", mime="text/plain")
-
-    # ----------------------------
     with tab3:
         st.subheader("Fetch, Summarize & Explain from URL")
         url_input = st.text_input("Enter a URL:")
 
         if st.button("Fetch & Analyze URL"):
-            if not url_input.strip():
-                st.warning("Please enter a valid URL.")
-            else:
+            if url_input.strip():
                 data = fetch_from_url(url_input.strip())
                 if data.startswith("❌ Error"):
                     st.error(data)
@@ -673,18 +583,16 @@ def main():
                     if is_code:
                         report = analyze_python(data, summary_length=5)
                         ai_det = detect_ai_generated_code(data)
-                        with st.expander("💻 Code Analysis Report from URL (click to expand)"):
-                            st.json({"analysis": report, "ai_detection": ai_det})
+                        with st.expander("💻 URL Code Analysis", expanded=True):
+                            st.write({"analysis": report, "ai_detection": ai_det})
                             copy_button("Copy Report", str({"analysis": report, "ai_detection": ai_det}), key="url_code_copy")
                             st.download_button("⬇️ Download Code Report", str({"analysis": report, "ai_detection": ai_det}), "url_code_analysis.txt")
                     else:
                         summary = summarize_text_advanced(data, max_sentences=5, as_bullets=False)
-                        with st.expander("📌 Document Summary from URL (click to expand)"):
+                        with st.expander("📌 URL Document Summary", expanded=True):
                             st.write(summary)
                             copy_button("Copy Summary", summary, key="url_summary_copy")
                             st.download_button("⬇️ Download Summary", summary, "url_summary.txt")
 
-
 if __name__ == "__main__":
     main()
-``
