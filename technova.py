@@ -874,9 +874,6 @@
 
 
 
-
-
-
 # technova_app.py
 import streamlit as st
 import requests
@@ -887,7 +884,7 @@ import ast
 from collections import Counter
 import io
 
-# PDF extraction (PyPDF2)
+# PDF extraction
 try:
     import PyPDF2
 except Exception:
@@ -923,7 +920,7 @@ def copy_button(text: str, label: str = "Copy", key: str = None):
     st.markdown(html, unsafe_allow_html=True)
 
 # ----------------------------
-# Advanced tech-like animated background
+# Tech-like animated background
 # ----------------------------
 def set_canvas_background():
     canvas_html = """
@@ -984,11 +981,9 @@ st.title("🌌 Technova AI Toolkit")
 st.caption("Document summarizer • Code analyzer • AI vs Human scanner • URL fetcher — sleek tech UI")
 
 # ----------------------------
-# Summarization helpers
+# Summarizer helpers
 # ----------------------------
-STOPWORDS = set(
-    "a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split()
-)
+STOPWORDS = set("a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split())
 
 def safe_sentence_split(text: str):
     pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
@@ -1001,7 +996,6 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         sentences.extend(safe_sentence_split(para))
     if not sentences:
         return text
-
     word_freq = Counter()
     for s in sentences:
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
@@ -1010,11 +1004,9 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
                 word_freq[w] += 1
     if not word_freq:
         return " ".join(sentences[:max_sentences])
-
     max_freq = max(word_freq.values())
     for w in list(word_freq.keys()):
         word_freq[w] /= max_freq
-
     scored = []
     for idx, s in enumerate(sentences):
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
@@ -1022,7 +1014,6 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20) / 20)
         position_boost = 1.1 if idx < 3 else 1.0
         scored.append((score / length_penalty * position_boost, idx, s))
-
     scored.sort(key=lambda x: (-x[0], x[1]))
     top = sorted(scored[:max_sentences], key=lambda x: x[1])
     if as_bullets:
@@ -1030,55 +1021,225 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     return " ".join([s for _, _, s in top])
 
 # ----------------------------
+# Code Analyzer helper
+# ----------------------------
+def analyze_python(code: str):
+    report = {"functions": [], "classes": [], "imports": [], "purpose_summary": "", "errors": [], "warnings": [], "fixes": []}
+    for line in code.splitlines():
+        l = line.strip()
+        if l.startswith("def "):
+            report["functions"].append(l.split("(")[0][4:].strip())
+        elif l.startswith("class "):
+            report["classes"].append(l.split("(")[0][6:].strip().rstrip(":"))
+        elif l.startswith("import ") or l.startswith("from "):
+            report["imports"].append(l)
+    report["purpose_summary"] = summarize_text_advanced(code, max_sentences=5)
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
+        report["fixes"].append("Check indentation, missing colons, parentheses, or quotes.")
+        return report
+    imported_names, used_names, assigned_names = set(), set(), set()
+    function_defs, class_defs = [], []
+    class Analyzer(ast.NodeVisitor):
+        def visit_Import(self, node):
+            for alias in node.names:
+                imported_names.add(alias.asname or alias.name.split(".")[0])
+            self.generic_visit(node)
+        def visit_ImportFrom(self, node):
+            for alias in node.names:
+                imported_names.add(alias.asname or alias.name)
+            self.generic_visit(node)
+        def visit_FunctionDef(self, node):
+            function_defs.append(node)
+            assigned_names.add(node.name)
+            for default in node.args.defaults:
+                if isinstance(default, (ast.List, ast.Dict, ast.Set)):
+                    report["warnings"].append(f"Mutable default argument in function '{node.name}' at line {node.lineno}")
+                    report["fixes"].append(f"Use None as default for mutable types in '{node.name}' and create new objects inside the function.")
+            self.generic_visit(node)
+        def visit_ClassDef(self, node):
+            class_defs.append(node)
+            assigned_names.add(node.name)
+            self.generic_visit(node)
+        def visit_Name(self, node):
+            if isinstance(node.ctx, ast.Load):
+                used_names.add(node.id)
+            if isinstance(node.ctx, ast.Store):
+                assigned_names.add(node.id)
+            self.generic_visit(node)
+    Analyzer().visit(tree)
+    for name in sorted(imported_names):
+        if name not in used_names and name not in {"__future__"}:
+            report["warnings"].append(f"Possibly unused import '{name}'")
+            report["fixes"].append(f"Remove the unused import '{name}'.")
+    for name in assigned_names:
+        if name in dir(__builtins__):
+            report["warnings"].append(f"Variable or function '{name}' shadows built-in")
+            report["fixes"].append(f"Rename '{name}' to avoid shadowing built-ins.")
+    if ast.get_docstring(tree) is None:
+        report["warnings"].append("Module is missing a top-level docstring")
+        report["fixes"].append("Add a brief module docstring describing purpose and usage.")
+    for fn in function_defs:
+        if ast.get_docstring(fn) is None:
+            report["warnings"].append(f"Function '{fn.name}' missing a docstring")
+            report["fixes"].append(f"Add a concise docstring for '{fn.name}'.")
+    for cl in class_defs:
+        if ast.get_docstring(cl) is None:
+            report["warnings"].append(f"Class '{cl.name}' missing a docstring")
+            report["fixes"].append(f"Add a concise docstring for class '{cl.name}'.")
+    if not report["errors"]:
+        if report["warnings"]:
+            report["fixes"].append("Review warnings and apply the proposed fixes.")
+        else:
+            report["fixes"].append("No obvious issues; add tests and run linters for confidence.")
+    return report
+
+# ----------------------------
+# AI Detector
+# ----------------------------
+def detect_ai_generated_code(code: str) -> dict:
+    lines = [ln for ln in code.splitlines()]
+    code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+    comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
+    features = {}
+    total = max(1, len(lines))
+    features["comment_density"] = len(comment_lines)/total
+    normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+    counts = Counter(normalized)
+    repeated = sum(c for c in counts.values() if c>1)
+    features["repeated_line_ratio"] = repeated/max(1,len(code_lines))
+    docstring_like = re.findall(r'\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\'', code, flags=re.S)
+    docstrings = [d[0] or d[1] for d in docstring_like]
+    templated_docs = sum(1 for d in docstrings if re.match(r"(?i)\s*(this function|returns|parameters)\b", d.strip()))
+    features["templated_doc_ratio"] = (templated_docs/max(1,len(docstrings))) if docstrings else 0.0
+    generic_names = {"data","result","results","temp","value","values","item","items","input","output","res"}
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
+    generic_count = sum(1 for t in tokens if t in generic_names)
+    features["generic_name_density"] = generic_count/max(1,len(tokens)) if tokens else 0.0
+    words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", code)]
+    trigrams = [tuple(words[i:i+3]) for i in range(len(words)-2)]
+    trigram_counts = Counter(trigrams)
+    repeating_trigram_ratio = sum(1 for c in trigram_counts.values() if c>1)/max(1,len(trigram_counts)) if trigram_counts else 0.0
+    features["repeating_trigram_ratio"] = repeating_trigram_ratio
+    score = (
+        35*features["repeating_trigram_ratio"]+
+        20*min(1.0, abs(features["comment_density"]-0.15)/0.15)+
+        20*features["repeated_line_ratio"]+
+        15*features["templated_doc_ratio"]+
+        10*min(1.0, features["generic_name_density"]*20)
+    )
+    score = max(0.0, min(100.0, score))
+    if score>=65: label="Likely AI-generated"
+    elif score>=45: label="Unclear / Mixed"
+    else: label="Likely human-written"
+    reasons=[]
+    if features["repeating_trigram_ratio"]>0.08: reasons.append("High repeated phrasing patterns.")
+    if features["repeated_line_ratio"]>0.06: reasons.append("Notable repetition of similar lines.")
+    if features["templated_doc_ratio"]>0.4: reasons.append("Docstrings appear templated.")
+    if features["comment_density"]<0.03 or features["comment_density"]>0.4: reasons.append("Unusual comment density.")
+    return {"label": label, "score": round(score,2), "reasons": reasons, "features": features}
+
+# ----------------------------
+# URL fetch helper
+# ----------------------------
+def fetch_from_url(url: str) -> str:
+    try:
+        resp = requests.get(url, timeout=12)
+        resp.raise_for_status()
+        ct = resp.headers.get("Content-Type", "")
+        if "text/html" in ct:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for s in soup(["script", "style", "noscript"]):
+                s.extract()
+            return soup.get_text(separator="\n")
+        return resp.text
+    except Exception as e:
+        return f"❌ Error fetching URL: {str(e)}"
+
+# ----------------------------
 # Tabs
 # ----------------------------
 tabs = st.tabs(["Document Summarizer", "Code Analyzer", "AI vs Human Scanner", "URL Fetch & Explain"])
 
-# 1️⃣ Document Summarizer
+# ----------------------------
+# Tab 1: Document Summarizer
+# ----------------------------
 with tabs[0]:
-    st.header("📄 Document Summarizer")
-    doc_text = st.text_area("Paste text", key="doc_text_input")
-    doc_file = st.file_uploader("Upload a file (.txt, .md, .pdf)", type=["txt", "md", "pdf"], key="doc_file_upload")
-    doc_url = st.text_input("Or enter URL to fetch content", key="doc_url_input")
-    doc_len = st.slider("Summary length (sentences)", 1, 12, 5, key="doc_summary_len")
-    doc_bullets = st.checkbox("Return bullets", value=False, key="doc_as_bullets")
-
-    if st.button("Summarize Document", key="doc_summarize_btn"):
-        content = ""
-        if doc_file:
-            fn = getattr(doc_file, "name", "")
-            if fn.lower().endswith(".pdf"):
-                if PyPDF2 is None:
-                    st.error("PDF support requires PyPDF2. Install it with 'pip install PyPDF2'.")
-                else:
-                    try:
-                        reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
-                        pages_text = []
-                        for p in reader.pages:
-                            pages_text.append(p.extract_text() or "")
-                        content = "\n".join(pages_text)
-                    except Exception as e:
-                        st.error(f"Failed to extract PDF text: {e}")
-                        content = ""
-            else:
-                try:
-                    content = doc_file.read().decode("utf-8", errors="ignore")
-                except Exception:
-                    doc_file.seek(0)
-                    content = doc_file.read().decode("latin-1", errors="ignore")
-        elif doc_url.strip():
-            content = fetch_from_url(doc_url.strip())
-        elif doc_text.strip():
-            content = doc_text
-
-        if not content:
-            st.warning("Please paste text, upload a file, or enter a URL.")
+    st.subheader("📄 Document Summarizer")
+    input_text = st.text_area("Paste document text or PDF content here:", height=300)
+    max_sent = st.slider("Maximum sentences in summary:", 1, 20, 5)
+    bullets = st.checkbox("Output as bullet points")
+    if st.button("Summarize"):
+        if input_text.strip():
+            summary = summarize_text_advanced(input_text, max_sentences=max_sent, as_bullets=bullets)
+            st.markdown(summary)
+            copy_button(summary)
         else:
-            summary = summarize_text_advanced(content, max_sentences=doc_len, as_bullets=doc_bullets)
-            with st.expander("📂 Summary (click to expand)", expanded=True):
-                if doc_bullets:
-                    st.markdown(summary)
-                else:
-                    st.write(summary)
-                copy_button(summary, label="Copy Summary", key="doc_summary_copy")
-                st.download_button("⬇ Download Summary", summary.encode("utf-8"), "document_summary.txt", key="doc_summary_download")
+            st.warning("Please enter document text.")
+
+# ----------------------------
+# Tab 2: Code Analyzer
+# ----------------------------
+with tabs[1]:
+    st.subheader("💻 Code Analyzer")
+    code_input = st.text_area("Paste Python code here:", height=300)
+    if st.button("Analyze Code"):
+        if code_input.strip():
+            result = analyze_python(code_input)
+            st.markdown("### ✅ Summary")
+            st.text(result["purpose_summary"])
+            copy_button(result["purpose_summary"])
+            if result["functions"]:
+                st.markdown("**Functions:** " + ", ".join(result["functions"]))
+            if result["classes"]:
+                st.markdown("**Classes:** " + ", ".join(result["classes"]))
+            if result["imports"]:
+                st.markdown("**Imports:** " + ", ".join(result["imports"]))
+            if result["errors"]:
+                st.error("Errors:\n" + "\n".join(result["errors"]))
+            if result["warnings"]:
+                st.warning("Warnings:\n" + "\n".join(result["warnings"]))
+            if result["fixes"]:
+                st.info("Suggested Fixes:\n" + "\n".join(result["fixes"]))
+        else:
+            st.warning("Please enter Python code.")
+
+# ----------------------------
+# Tab 3: AI vs Human Scanner
+# ----------------------------
+with tabs[2]:
+    st.subheader("🤖 AI vs Human Code Detector")
+    ai_code_input = st.text_area("Paste code to detect if AI-generated or human-written:", height=300)
+    if st.button("Detect AI Code"):
+        if ai_code_input.strip():
+            detection = detect_ai_generated_code(ai_code_input)
+            st.markdown(f"**Result:** {detection['label']}")
+            st.markdown(f"**Score (0-100):** {detection['score']}")
+            if detection['reasons']:
+                st.markdown("**Reasons:**")
+                for r in detection['reasons']:
+                    st.markdown(f"- {r}")
+            copy_button(detection['label'] + " | Score: " + str(detection['score']))
+        else:
+            st.warning("Please paste code for AI detection.")
+
+# ----------------------------
+# Tab 4: URL Fetch & Explain
+# ----------------------------
+with tabs[3]:
+    st.subheader("🌐 URL Fetch & Explain")
+    url_input = st.text_input("Enter URL to fetch content:")
+    max_sent_url = st.slider("Max sentences in summary:", 1, 20, 5, key="url_summary")
+    bullets_url = st.checkbox("Bullet points", key="url_bullets")
+    if st.button("Fetch & Summarize URL"):
+        if url_input.strip():
+            fetched = fetch_from_url(url_input)
+            st.text_area("Fetched Content:", value=fetched, height=250)
+            summary = summarize_text_advanced(fetched, max_sentences=max_sent_url, as_bullets=bullets_url)
+            st.markdown("### Summary of URL Content")
+            st.markdown(summary)
+            copy_button(summary)
+        else:
+            st.warning("Please enter a URL.")
