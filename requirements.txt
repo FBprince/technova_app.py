@@ -2,5 +2,14 @@ streamlit
 requests
 beautifulsoup4
 PyPDF2
+nltk
+pandas
+numpy 
 lxml
+chardet
+textstat
+langdetect
+pytest
+black
+flake8
 
