@@ -896,8 +896,6 @@
 
 
 
-
-# technova_app_enhanced.py
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -907,615 +905,175 @@ import ast
 from collections import Counter
 import io
 
-# PDF extraction (PyPDF2)
+# PDF extraction (optional)
 try:
     import PyPDF2
-except Exception:
-    PyPDF2 = None
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
 
 # Page config
-st.set_page_config(page_title="Technova AI Nexus", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Technova AI Nexus", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
 
-# ----------------------------
-# Advanced copy button with neon effects
-# ----------------------------
+# Enhanced copy button
 def copy_button(text: str, label: str = "Copy", key: str = None):
-    """Enhanced copy button with cyberpunk styling"""
+    """Enhanced copy button with styling"""
     if text is None:
         text = ""
     safe_b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
     el_id = f"copy-btn-{key}" if key else f"copy-btn-{abs(hash(text))}"
+    
     html = f"""
     <button id="{el_id}" onclick="navigator.clipboard.writeText(atob('{safe_b64}'))"
-        class="cyber-button copy-btn">
-        <span class="btn-icon">⚡</span> {label}
+        style="
+            background: linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2));
+            border: 1px solid rgba(0, 249, 255, 0.4);
+            color: #00f9ff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        "
+        onmouseover="this.style.background='linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3))'"
+        onmouseout="this.style.background='linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2))'">
+        ⚡ {label}
     </button>
     <script>
-    const btn_{el_id} = document.getElementById('{el_id}');
-    btn_{el_id}.addEventListener('click', () => {{
-        const old = btn_{el_id}.innerHTML;
-        btn_{el_id}.innerHTML = '<span class="btn-icon">✅</span> Copied';
-        btn_{el_id}.classList.add('copied');
-        setTimeout(()=>{{ 
-            btn_{el_id}.innerHTML = old; 
-            btn_{el_id}.classList.remove('copied');
+    document.getElementById('{el_id}').addEventListener('click', function() {{
+        const btn = this;
+        const oldText = btn.innerHTML;
+        btn.innerHTML = '✅ Copied!';
+        btn.style.background = 'linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3))';
+        setTimeout(() => {{
+            btn.innerHTML = oldText;
+            btn.style.background = 'linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2))';
         }}, 1500);
     }});
     </script>
     """
     st.markdown(html, unsafe_allow_html=True)
 
-# ----------------------------
-# Advanced cyberpunk background & comprehensive styling
-# ----------------------------
-def set_advanced_tech_styling():
-    style_html = """
+# Simplified styling
+def set_tech_styling():
+    st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;500&display=swap');
     
-    /* Advanced Animated Background */
-    body, [data-testid="stAppViewContainer"] {
-        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 25%, #16213e 50%, #0f0f23 75%, #000000 100%);
-        background-size: 400% 400%;
-        animation: gradientShift 15s ease infinite;
+    .stApp {
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
         color: #00f9ff;
-        font-family: 'Rajdhani', 'Orbitron', monospace;
-        overflow-x: hidden;
-        position: relative;
+        font-family: 'Rajdhani', sans-serif;
     }
     
-    @keyframes gradientShift {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-    }
-    
-    /* Animated Grid Overlay */
-    body::before {
-        content: '';
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background-image: 
-            linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
-        background-size: 50px 50px;
-        animation: gridMove 20s linear infinite;
-        z-index: -999;
-        pointer-events: none;
-    }
-    
-    @keyframes gridMove {
-        0% { transform: translate(0, 0); }
-        100% { transform: translate(50px, 50px); }
-    }
-    
-    /* Enhanced Typography */
     h1, h2, h3, h4, h5, h6 {
         font-family: 'Orbitron', monospace !important;
-        font-weight: 700 !important;
-        text-shadow: 0 0 10px #00f9ff, 0 0 20px #0099cc, 0 0 30px #0066ff !important;
-        animation: textGlow 3s ease-in-out infinite alternate;
-        letter-spacing: 2px;
-        margin-bottom: 1.5rem !important;
+        color: #00f9ff !important;
+        text-shadow: 0 0 10px rgba(0, 249, 255, 0.5);
     }
     
-    @keyframes textGlow {
-        from { text-shadow: 0 0 10px #00f9ff, 0 0 20px #0099cc; }
-        to { text-shadow: 0 0 20px #00f9ff, 0 0 30px #0099cc, 0 0 40px #0066ff; }
-    }
-    
-    /* Main title enhancement */
-    h1 {
-        font-size: 3rem !important;
-        background: linear-gradient(45deg, #00f9ff, #0099cc, #66ccff, #00f9ff);
-        background-size: 300% 300%;
+    .main-title {
+        font-size: 3rem;
+        text-align: center;
+        background: linear-gradient(45deg, #00f9ff, #0099cc, #66ccff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        animation: gradientText 4s ease infinite, titlePulse 2s ease-in-out infinite alternate;
+        margin: 2rem 0;
+    }
+    
+    .subtitle {
         text-align: center;
-        margin: 2rem 0 !important;
-        position: relative;
-    }
-    
-    @keyframes gradientText {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-    }
-    
-    @keyframes titlePulse {
-        from { transform: scale(1); }
-        to { transform: scale(1.02); }
-    }
-    
-    /* Enhanced paragraph text */
-    p, div, span {
-        font-family: 'Rajdhani', sans-serif !important;
-        font-weight: 400 !important;
-        color: #e0f7ff !important;
-        text-shadow: 0 0 5px rgba(0, 249, 255, 0.3);
-        line-height: 1.6;
-    }
-    
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background: linear-gradient(90deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.1));
-        border-radius: 15px;
-        padding: 5px;
+        color: rgba(0, 249, 255, 0.8);
+        font-style: italic;
         margin-bottom: 2rem;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(0, 249, 255, 0.2);
+    }
+    
+    .stTextArea textarea, .stTextInput input {
+        background: rgba(0, 20, 40, 0.8) !important;
+        border: 1px solid rgba(0, 249, 255, 0.3) !important;
+        color: #00f9ff !important;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3)) !important;
+        border: 1px solid rgba(0, 249, 255, 0.5) !important;
+        color: #00f9ff !important;
+        font-weight: bold !important;
     }
     
     .stTabs [data-baseweb="tab"] {
-        background: transparent !important;
         color: #00f9ff !important;
         font-family: 'Orbitron', monospace !important;
-        font-weight: 600 !important;
-        border-radius: 10px !important;
-        margin: 2px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        text-shadow: 0 0 5px rgba(0, 249, 255, 0.5);
-        border: 1px solid transparent !important;
     }
     
-    .stTabs [data-baseweb="tab"]:hover {
-        background: rgba(0, 249, 255, 0.1) !important;
-        transform: translateY(-2px);
-        border: 1px solid rgba(0, 249, 255, 0.3) !important;
-        box-shadow: 0 5px 15px rgba(0, 249, 255, 0.2);
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.2)) !important;
-        border: 1px solid rgba(0, 249, 255, 0.5) !important;
-        box-shadow: 0 0 20px rgba(0, 249, 255, 0.3), inset 0 0 10px rgba(0, 249, 255, 0.1);
-        color: #ffffff !important;
-    }
-    
-    /* Enhanced input fields */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea,
-    .stSelectbox > div > div > select {
-        background: rgba(0, 20, 40, 0.8) !important;
-        border: 1px solid rgba(0, 249, 255, 0.3) !important;
-        border-radius: 10px !important;
-        color: #00f9ff !important;
-        font-family: 'Rajdhani', monospace !important;
-        font-weight: 500 !important;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
-        box-shadow: 0 0 10px rgba(0, 249, 255, 0.1);
-    }
-    
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus {
-        border: 1px solid rgba(0, 249, 255, 0.8) !important;
-        box-shadow: 0 0 20px rgba(0, 249, 255, 0.3), 0 0 40px rgba(0, 249, 255, 0.1) !important;
-        transform: scale(1.01);
-    }
-    
-    /* Cyber buttons */
-    .cyber-button, .copy-btn {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2));
-        border: 1px solid rgba(0, 249, 255, 0.4);
-        color: #00f9ff;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-family: 'Orbitron', monospace;
-        font-weight: 700;
-        font-size: 0.9rem;
-        cursor: pointer;
-        margin: 5px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-        text-shadow: 0 0 5px rgba(0, 249, 255, 0.5);
-        backdrop-filter: blur(10px);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    
-    .cyber-button::before {
-        content: '';
-        position: absolute;
-        top: 0; left: -100%;
-        width: 100%; height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-        transition: left 0.5s;
-    }
-    
-    .cyber-button:hover::before {
-        left: 100%;
-    }
-    
-    .cyber-button:hover, .copy-btn:hover {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
-        border: 1px solid rgba(0, 249, 255, 0.8);
-        box-shadow: 0 0 25px rgba(0, 249, 255, 0.4), inset 0 0 15px rgba(0, 249, 255, 0.1);
-        transform: translateY(-3px) scale(1.05);
-        color: #ffffff;
-    }
-    
-    .cyber-button.copied {
-        background: linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3));
-        border: 1px solid rgba(0, 255, 0, 0.6);
-        color: #00ff88;
-    }
-    
-    /* Streamlit button override */
-    .stButton > button, .stDownloadButton > button {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.15), rgba(0, 153, 204, 0.25)) !important;
-        border: 1px solid rgba(0, 249, 255, 0.4) !important;
-        color: #00f9ff !important;
-        font-family: 'Orbitron', monospace !important;
-        font-weight: 700 !important;
-        border-radius: 10px !important;
-        padding: 12px 24px !important;
-        transition: all 0.3s ease !important;
-        text-shadow: 0 0 5px rgba(0, 249, 255, 0.5);
-        backdrop-filter: blur(10px);
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .stButton > button:hover, .stDownloadButton > button:hover {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.25), rgba(0, 153, 204, 0.35)) !important;
-        border: 1px solid rgba(0, 249, 255, 0.8) !important;
-        box-shadow: 0 0 25px rgba(0, 249, 255, 0.4) !important;
-        transform: translateY(-3px) scale(1.05) !important;
-        color: #ffffff !important;
-    }
-    
-    /* Enhanced expanders */
-    .streamlit-expanderHeader {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.08), rgba(0, 153, 204, 0.12)) !important;
-        border: 1px solid rgba(0, 249, 255, 0.2) !important;
-        border-radius: 10px !important;
-        color: #00f9ff !important;
-        font-family: 'Orbitron', monospace !important;
-        font-weight: 600 !important;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
-        margin: 10px 0;
-    }
-    
-    .streamlit-expanderHeader:hover {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.15), rgba(0, 153, 204, 0.2)) !important;
-        border: 1px solid rgba(0, 249, 255, 0.4) !important;
-        box-shadow: 0 0 15px rgba(0, 249, 255, 0.2);
-        transform: translateX(5px);
-    }
-    
-    .streamlit-expanderContent {
-        background: rgba(0, 20, 40, 0.3) !important;
-        border: 1px solid rgba(0, 249, 255, 0.1) !important;
-        border-radius: 0 0 10px 10px !important;
-        backdrop-filter: blur(10px);
-        padding: 20px;
-        margin-top: -1px;
-    }
-    
-    /* Enhanced sliders */
-    .stSlider > div > div > div > div {
-        background: linear-gradient(90deg, rgba(0, 249, 255, 0.3), rgba(0, 153, 204, 0.5)) !important;
-    }
-    
-    .stSlider > div > div > div > div > div {
-        background: #00f9ff !important;
-        border: 2px solid #ffffff !important;
-        box-shadow: 0 0 15px rgba(0, 249, 255, 0.6);
-    }
-    
-    /* Code blocks enhancement */
-    .stCodeBlock {
-        background: rgba(0, 10, 20, 0.9) !important;
-        border: 1px solid rgba(0, 249, 255, 0.2) !important;
-        border-radius: 15px !important;
-        backdrop-filter: blur(10px);
-    }
-    
-    /* File uploader styling */
-    .stFileUploader {
-        border: 2px dashed rgba(0, 249, 255, 0.3) !important;
-        border-radius: 15px !important;
-        background: rgba(0, 20, 40, 0.2) !important;
-        transition: all 0.3s ease;
-    }
-    
-    .stFileUploader:hover {
-        border: 2px dashed rgba(0, 249, 255, 0.6) !important;
-        background: rgba(0, 20, 40, 0.4) !important;
-        box-shadow: 0 0 20px rgba(0, 249, 255, 0.2);
-    }
-    
-    /* Warning and error styling */
-    .stAlert {
-        border-radius: 10px !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        font-family: 'Rajdhani', sans-serif !important;
-    }
-    
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-        width: 12px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: rgba(0, 20, 40, 0.3);
+    .stExpander {
+        border: 1px solid rgba(0, 249, 255, 0.3);
         border-radius: 10px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.3), rgba(0, 153, 204, 0.5));
-        border-radius: 10px;
-        border: 2px solid rgba(0, 20, 40, 0.3);
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.5), rgba(0, 153, 204, 0.7));
-        box-shadow: 0 0 10px rgba(0, 249, 255, 0.3);
-    }
-    
-    /* Caption styling */
-    .caption {
-        font-family: 'Rajdhani', sans-serif !important;
-        color: rgba(0, 249, 255, 0.8) !important;
-        font-size: 1.1rem !important;
-        text-align: center;
-        margin-bottom: 2rem;
-        font-style: italic;
-        text-shadow: 0 0 8px rgba(0, 249, 255, 0.4);
-    }
-    
-    /* Floating particles effect */
-    .particles {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        pointer-events: none;
-        z-index: -998;
-    }
-    
-    .particle {
-        position: absolute;
-        width: 2px; height: 2px;
-        background: rgba(0, 249, 255, 0.6);
-        border-radius: 50%;
-        animation: float 15s infinite linear;
-    }
-    
-    @keyframes float {
-        0% { 
-            transform: translateY(100vh) translateX(0);
-            opacity: 0;
-        }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { 
-            transform: translateY(-10vh) translateX(100px);
-            opacity: 0;
-        }
-    }
-    
-    /* Checkbox and radio styling */
-    .stCheckbox > label, .stRadio > label {
-        color: #00f9ff !important;
-        font-family: 'Rajdhani', sans-serif !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Metric styling */
-    [data-testid="metric-container"] {
-        background: rgba(0, 20, 40, 0.3);
-        border: 1px solid rgba(0, 249, 255, 0.2);
-        border-radius: 15px;
-        padding: 15px;
-        backdrop-filter: blur(10px);
     }
     </style>
-    
-    <!-- Floating Particles -->
-    <div class="particles" id="particles"></div>
-    
-    <!-- Advanced Canvas Animation -->
-    <canvas id="tech-canvas" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1000; pointer-events:none;"></canvas>
-    
-    <script>
-    // Create floating particles
-    function createParticles() {
-        const container = document.getElementById('particles');
-        if (!container) return;
-        
-        for (let i = 0; i < 30; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'particle';
-            particle.style.left = Math.random() * 100 + 'vw';
-            particle.style.animationDelay = Math.random() * 15 + 's';
-            particle.style.animationDuration = (15 + Math.random() * 10) + 's';
-            container.appendChild(particle);
-        }
-    }
-    
-    // Advanced canvas animation
-    function setupAdvancedCanvas() {
-        const canvas = document.getElementById('tech-canvas');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        let animationId;
-        
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        
-        window.addEventListener('resize', resize);
-        resize();
-        
-        // Neural network nodes
-        const nodes = [];
-        const connections = [];
-        const numNodes = 15;
-        
-        for (let i = 0; i < numNodes; i++) {
-            nodes.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                vx: (Math.random() - 0.5) * 0.5,
-                vy: (Math.random() - 0.5) * 0.5,
-                radius: Math.random() * 3 + 1,
-                pulse: Math.random() * Math.PI * 2,
-                pulseSpeed: 0.02 + Math.random() * 0.02
-            });
-        }
-        
-        // Scanning lines
-        const scanLines = [];
-        for (let i = 0; i < 3; i++) {
-            scanLines.push({
-                y: Math.random() * canvas.height,
-                speed: 0.5 + Math.random() * 1,
-                opacity: 0.3 + Math.random() * 0.3
-            });
-        }
-        
-        function animate() {
-            // Clear with gradient
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, 'rgba(10, 10, 28, 0.05)');
-            gradient.addColorStop(0.5, 'rgba(22, 33, 62, 0.05)');
-            gradient.addColorStop(1, 'rgba(15, 15, 35, 0.05)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Update and draw nodes
-            nodes.forEach((node, i) => {
-                // Update position
-                node.x += node.vx;
-                node.y += node.vy;
-                node.pulse += node.pulseSpeed;
-                
-                // Bounce off edges
-                if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
-                if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
-                
-                // Keep in bounds
-                node.x = Math.max(0, Math.min(canvas.width, node.x));
-                node.y = Math.max(0, Math.min(canvas.height, node.y));
-                
-                // Draw node with pulse effect
-                const pulseIntensity = Math.sin(node.pulse) * 0.3 + 0.7;
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, node.radius * pulseIntensity, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(0, 249, 255, ${pulseIntensity * 0.8})`;
-                ctx.fill();
-                
-                // Draw node glow
-                const glowGradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, node.radius * 4);
-                glowGradient.addColorStop(0, `rgba(0, 249, 255, ${pulseIntensity * 0.3})`);
-                glowGradient.addColorStop(1, 'rgba(0, 249, 255, 0)');
-                ctx.fillStyle = glowGradient;
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, node.radius * 4, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw connections
-                nodes.forEach((other, j) => {
-                    if (i !== j) {
-                        const dist = Math.sqrt((node.x - other.x) ** 2 + (node.y - other.y) ** 2);
-                        if (dist < 150) {
-                            const opacity = (150 - dist) / 150 * 0.3;
-                            ctx.strokeStyle = `rgba(0, 249, 255, ${opacity})`;
-                            ctx.lineWidth = 1;
-                            ctx.beginPath();
-                            ctx.moveTo(node.x, node.y);
-                            ctx.lineTo(other.x, other.y);
-                            ctx.stroke();
-                        }
-                    }
-                });
-            });
-            
-            // Draw scanning lines
-            scanLines.forEach(line => {
-                line.y += line.speed;
-                if (line.y > canvas.height + 50) {
-                    line.y = -50;
-                    line.speed = 0.5 + Math.random() * 1;
-                }
-                
-                const lineGradient = ctx.createLinearGradient(0, line.y - 25, 0, line.y + 25);
-                lineGradient.addColorStop(0, 'rgba(0, 249, 255, 0)');
-                lineGradient.addColorStop(0.5, `rgba(0, 249, 255, ${line.opacity})`);
-                lineGradient.addColorStop(1, 'rgba(0, 249, 255, 0)');
-                
-                ctx.fillStyle = lineGradient;
-                ctx.fillRect(0, line.y - 25, canvas.width, 50);
-            });
-            
-            animationId = requestAnimationFrame(animate);
-        }
-        
-        animate();
-        createParticles();
-    }
-    
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupAdvancedCanvas);
-    } else {
-        setupAdvancedCanvas();
-    }
-    
-    // Reinitialize on Streamlit rerun
-    setTimeout(setupAdvancedCanvas, 100);
-    </script>
-    """
-    st.markdown(style_html, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# Initialize advanced styling
-set_advanced_tech_styling()
+# Initialize styling
+set_tech_styling()
 
-# Enhanced title with subtitle
-st.markdown("""
-<h1 style="text-align: center; margin-bottom: 0;">🌌 TECHNOVA AI NEXUS</h1>
-<div class="caption">Advanced AI-Powered Analysis Suite • Neural Document Processing • Quantum Code Analysis</div>
-""", unsafe_allow_html=True)
+# Main title
+st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Advanced AI-Powered Analysis Suite</p>', unsafe_allow_html=True)
 
-# ----------------------------
-# Keep all the original functionality (summarization helpers, etc.)
-# ----------------------------
-STOPWORDS = set(
-    "a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with you your from our we he she his her its were been being than also can could should would may might have has had do does did done just over under more most other some any each many few those them which who whom whose where when why how".split()
-)
+# Stopwords for summarization
+STOPWORDS = set([
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", 
+    "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", 
+    "there", "these", "they", "this", "to", "was", "will", "with", "you", "your", "from", 
+    "our", "we", "he", "she", "his", "her", "its", "were", "been", "being", "than", 
+    "also", "can", "could", "should", "would", "may", "might", "have", "has", "had", 
+    "do", "does", "did", "done", "just", "over", "under", "more", "most", "other", 
+    "some", "any", "each", "many", "few", "those", "them", "which", "who", "whom", 
+    "whose", "where", "when", "why", "how"
+])
 
 def safe_sentence_split(text: str):
+    """Split text into sentences safely"""
     pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
     return [s.strip() for s in pattern.split(text) if s.strip()]
 
 def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool = False) -> str:
+    """Advanced text summarization using frequency analysis"""
+    if not text or not text.strip():
+        return "No content to summarize."
+    
     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
     sentences = []
     for para in paragraphs:
         sentences.extend(safe_sentence_split(para))
+    
     if not sentences:
         return text
 
+    # Word frequency analysis
     word_freq = Counter()
     for s in sentences:
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
         for w in words:
             if w not in STOPWORDS and len(w) > 2:
                 word_freq[w] += 1
+    
     if not word_freq:
         return " ".join(sentences[:max_sentences])
 
+    # Normalize frequencies
     max_freq = max(word_freq.values())
     for w in list(word_freq.keys()):
         word_freq[w] /= max_freq
 
+    # Score sentences
     scored = []
     for idx, s in enumerate(sentences):
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
@@ -1524,40 +1082,55 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         position_boost = 1.1 if idx < 3 else 1.0
         scored.append((score / length_penalty * position_boost, idx, s))
 
+    # Select top sentences
     scored.sort(key=lambda x: (-x[0], x[1]))
     top = sorted(scored[:max_sentences], key=lambda x: x[1])
+    
     if as_bullets:
         return "\n".join([f"• {s}" for _, _, s in top])
     return " ".join([s for _, _, s in top])
 
 def analyze_python(code: str):
-    report = {"functions": [], "classes": [], "imports": [], "purpose_summary": "", "errors": [], "warnings": [], "fixes": []}
+    """Comprehensive Python code analysis"""
+    report = {
+        "functions": [], 
+        "classes": [], 
+        "imports": [], 
+        "purpose_summary": "", 
+        "errors": [], 
+        "warnings": [], 
+        "fixes": []
+    }
 
+    # Basic parsing
     for line in code.splitlines():
         l = line.strip()
         if l.startswith("def "):
-            report["functions"].append(l.split("(")[0][4:].strip())
+            func_name = l.split("(")[0][4:].strip()
+            report["functions"].append(func_name)
         elif l.startswith("class "):
-            report["classes"].append(l.split("(")[0][6:].strip().rstrip(":"))
+            class_name = l.split("(")[0][6:].strip().rstrip(":")
+            report["classes"].append(class_name)
         elif l.startswith("import ") or l.startswith("from "):
             report["imports"].append(l)
 
-    report["purpose_summary"] = summarize_text_advanced(code, max_sentences=5)
+    # Generate purpose summary
+    report["purpose_summary"] = summarize_text_advanced(code, max_sentences=3)
 
+    # AST analysis for deeper insights
     try:
         tree = ast.parse(code)
     except SyntaxError as e:
         report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
-        report["fixes"].append("Check indentation, missing colons, parentheses, or quotes.")
+        report["fixes"].append("Check syntax: indentation, colons, parentheses, quotes.")
         return report
 
+    # Analyze AST
     imported_names = set()
     used_names = set()
     assigned_names = set()
-    function_defs = []
-    class_defs = []
 
-    class Analyzer(ast.NodeVisitor):
+    class CodeAnalyzer(ast.NodeVisitor):
         def visit_Import(self, node):
             for alias in node.names:
                 imported_names.add(alias.asname or alias.name.split(".")[0])
@@ -1569,475 +1142,450 @@ def analyze_python(code: str):
             self.generic_visit(node)
 
         def visit_FunctionDef(self, node):
-            function_defs.append(node)
             assigned_names.add(node.name)
+            # Check for mutable default arguments
             for default in node.args.defaults:
                 if isinstance(default, (ast.List, ast.Dict, ast.Set)):
-                    report["warnings"].append(f"Mutable default argument in function '{node.name}' at line {node.lineno}")
-                    report["fixes"].append(f"Use None as default for mutable types in '{node.name}' and create new objects inside the function.")
+                    report["warnings"].append(f"Mutable default argument in '{node.name}'")
+                    report["fixes"].append(f"Use None as default in '{node.name}' and create objects inside function")
             self.generic_visit(node)
 
         def visit_ClassDef(self, node):
-            class_defs.append(node)
             assigned_names.add(node.name)
             self.generic_visit(node)
 
         def visit_Name(self, node):
             if isinstance(node.ctx, ast.Load):
                 used_names.add(node.id)
-            if isinstance(node.ctx, ast.Store):
+            elif isinstance(node.ctx, ast.Store):
                 assigned_names.add(node.id)
             self.generic_visit(node)
 
         def visit_Call(self, node):
             if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec"}:
-                report["warnings"].append(f"Use of {node.func.id} detected at line {node.lineno}")
-                report["fixes"].append(f"Avoid {node.func.id}; consider safer alternatives or explicit parsing.")
+                report["warnings"].append(f"Dangerous {node.func.id} usage detected")
+                report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
             self.generic_visit(node)
 
-        def visit_ExceptHandler(self, node):
-            if node.type is None:
-                report["warnings"].append(f"Bare except detected at line {node.lineno}")
-                report["fixes"].append("Catch specific exception classes instead of a bare except.")
-            elif isinstance(node.type, ast.Name) and node.type.id in {"Exception", "BaseException"}:
-                report["warnings"].append(f"Overly broad exception handler '{node.type.id}' at line {node.lineno}")
-                report["fixes"].append("Catch the narrowest relevant exception type.")
-            if len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
-                report["warnings"].append(f"Exception swallowed with pass at line {node.lineno}")
-                report["fixes"].append("Handle the exception or log it; avoid silent failures.")
-            self.generic_visit(node)
+    CodeAnalyzer().visit(tree)
 
-    Analyzer().visit(tree)
-
+    # Check for unused imports
     for name in sorted(imported_names):
         if name not in used_names and name not in {"__future__"}:
-            report["warnings"].append(f"Possibly unused import '{name}'")
-            report["fixes"].append(f"Remove the unused import '{name}'.")
+            report["warnings"].append(f"Possibly unused import: '{name}'")
+            report["fixes"].append(f"Remove unused import '{name}'")
 
+    # Check for builtin shadowing
+    builtins_list = [
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate', 
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input', 
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round', 
+        'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+    ]
+    
     for name in assigned_names:
-        if name in dir(__builtins__):
-            report["warnings"].append(f"Variable or function '{name}' shadows built-in")
-            report["fixes"].append(f"Rename '{name}' to avoid shadowing built-ins.")
+        if name in builtins_list:
+            report["warnings"].append(f"Variable '{name}' shadows builtin")
+            report["fixes"].append(f"Rename '{name}' to avoid shadowing builtins")
 
-    # Simple unreachable code detection
-    for fn in function_defs:
-        seen_terminator = False
-        for node in fn.body:
-            if seen_terminator:
-                report["warnings"].append(f"Unreachable code in function '{fn.name}' after a return/raise at line {getattr(node, 'lineno', '?')}")
-                report["fixes"].append(f"Remove or refactor unreachable code in '{fn.name}'.")
-                break
-            if isinstance(node, (ast.Return, ast.Raise)):
-                seen_terminator = True
-
-    # Docstrings
-    if ast.get_docstring(tree) is None:
-        report["warnings"].append("Module is missing a top-level docstring")
-        report["fixes"].append("Add a brief module docstring describing purpose and usage.")
-    for fn in function_defs:
-        if ast.get_docstring(fn) is None:
-            report["warnings"].append(f"Function '{fn.name}' missing a docstring")
-            report["fixes"].append(f"Add a concise docstring for '{fn.name}'.")
-    for cl in class_defs:
-        if ast.get_docstring(cl) is None:
-            report["warnings"].append(f"Class '{cl.name}' missing a docstring")
-            report["fixes"].append(f"Add a concise docstring for class '{cl.name}'.")
-
-    # Undefined function calls (simple)
-    defined = {fn.name for fn in function_defs} | {cl.name for cl in class_defs}
-    called = set()
-    class CallVisitor(ast.NodeVisitor):
-        def visit_Call(self, node):
-            if isinstance(node.func, ast.Name):
-                called.add(node.func.id)
-            self.generic_visit(node)
-    CallVisitor().visit(tree)
-    for func in sorted(called):
-        if func not in defined and func not in dir(__builtins__):
-            report["warnings"].append(f"Call to undefined function '{func}' detected")
-            report["fixes"].append(f"Define '{func}' or import it before use.")
-
+    # Add general recommendations
     if not report["errors"]:
-        if report["warnings"]:
-            report["fixes"].append("Review warnings and apply the proposed fixes.")
+        if not report["warnings"]:
+            report["fixes"].append("Code looks good! Consider adding tests and documentation.")
         else:
-            report["fixes"].append("No obvious issues; add tests and run linters for confidence.")
+            report["fixes"].append("Review warnings above and apply suggested fixes.")
 
     return report
 
 def detect_ai_generated_code(code: str) -> dict:
-    lines = [ln for ln in code.splitlines()]
+    """Detect if code might be AI-generated based on patterns"""
+    if not code or not code.strip():
+        return {"score": 0, "label": "❓ No content", "reasons": [], "features": {}}
+    
+    lines = code.splitlines()
     code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
     comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
+    
     features = {}
-    total = max(1, len(lines))
-    features["comment_density"] = len(comment_lines) / total
+    total_lines = max(1, len(lines))
+    
+    # Comment density
+    features["comment_density"] = len(comment_lines) / total_lines
+    
+    # Repeated lines
     normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
     counts = Counter(normalized)
     repeated = sum(c for c in counts.values() if c > 1)
     features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
-    docstring_like = re.findall(r'\"\"\"(.*?)\"\"\"|\'\'\'(.*?)\'\'\'', code, flags=re.S)
-    docstrings = [d[0] or d[1] for d in docstring_like]
-    templated_docs = sum(1 for d in docstrings if re.match(r"(?i)\s*(this function|returns|parameters)\b", d.strip()))
-    features["templated_doc_ratio"] = (templated_docs / max(1, len(docstrings))) if docstrings else 0.0
-    generic_names = {"data", "result", "results", "temp", "value", "values", "item", "items", "input", "output", "res"}
+    
+    # Generic variable names
+    generic_names = {"data", "result", "temp", "value", "item", "input", "output", "res"}
     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
     generic_count = sum(1 for t in tokens if t in generic_names)
-    features["generic_name_density"] = generic_count / max(1, len(tokens)) if tokens else 0.0
-    words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", code)]
-    trigrams = [tuple(words[i:i+3]) for i in range(len(words) - 2)]
-    trigram_counts = Counter(trigrams)
-    repeating_trigram_ratio = sum(1 for c in trigram_counts.values() if c > 1) / max(1, len(trigram_counts)) if trigram_counts else 0.0
-    features["repeating_trigram_ratio"] = repeating_trigram_ratio
+    features["generic_name_density"] = generic_count / max(1, len(tokens))
+    
+    # Calculate score
     score = (
-        35 * features["repeating_trigram_ratio"]
-        + 20 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15)
-        + 20 * features["repeated_line_ratio"]
-        + 15 * features["templated_doc_ratio"]
-        + 10 * min(1.0, features["generic_name_density"] * 20)
+        25 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15) +
+        35 * features["repeated_line_ratio"] +
+        20 * min(1.0, features["generic_name_density"] * 20) +
+        20 * (1.0 if len(code_lines) > 50 and features["comment_density"] < 0.05 else 0.0)
     )
+    
     score = max(0.0, min(100.0, score))
-    if score >= 65:
-        label = "⚠️ Likely AI-generated"
+    
+    # Determine label
+    if score >= 70:
+        label = "🚨 Likely AI-generated"
     elif score >= 45:
-        label = "🔍 Unclear / Mixed"
+        label = "🤔 Unclear/Mixed"
     else:
         label = "✅ Likely human-written"
+    
+    # Generate reasons
     reasons = []
-    if features["repeating_trigram_ratio"] > 0.08:
-        reasons.append("High repeated phrasing patterns.")
-    if features["repeated_line_ratio"] > 0.06:
-        reasons.append("Notable repetition of similar lines.")
-    if features["templated_doc_ratio"] > 0.4:
-        reasons.append("Docstrings appear templated.")
-    if features["comment_density"] < 0.03 or features["comment_density"] > 0.4:
-        reasons.append("Atypical comment density.")
-    if features["generic_name_density"] > 0.02:
-        reasons.append("Frequent use of generic variable names.")
-    return {"score": round(score, 1), "label": label, "reasons": reasons, "features": features}
+    if features["repeated_line_ratio"] > 0.1:
+        reasons.append("High repetition of similar code patterns")
+    if features["comment_density"] < 0.02 or features["comment_density"] > 0.4:
+        reasons.append("Unusual comment density")
+    if features["generic_name_density"] > 0.03:
+        reasons.append("Frequent generic variable names")
+    
+    return {
+        "score": round(score, 1), 
+        "label": label, 
+        "reasons": reasons, 
+        "features": features
+    }
 
 def fetch_from_url(url: str) -> str:
+    """Fetch and extract text content from URL"""
     try:
-        resp = requests.get(url, timeout=12)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        resp = requests.get(url, timeout=10, headers=headers)
         resp.raise_for_status()
-        ct = resp.headers.get("Content-Type", "")
-        if "text/html" in ct:
+        
+        content_type = resp.headers.get("Content-Type", "")
+        if "text/html" in content_type:
             soup = BeautifulSoup(resp.text, "html.parser")
-            for s in soup(["script", "style", "noscript"]):
-                s.extract()
-            return soup.get_text(separator="\n")
-        return resp.text
-    except Exception as e:
+            # Remove unwanted elements
+            for element in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                element.extract()
+            return soup.get_text(separator="\n", strip=True)
+        else:
+            return resp.text
+            
+    except requests.exceptions.RequestException as e:
         return f"❌ Error fetching URL: {str(e)}"
+    except Exception as e:
+        return f"❌ Error processing content: {str(e)}"
 
-# ----------------------------
-# Enhanced tabs with icons
-# ----------------------------
+# Create tabs
 tabs = st.tabs([
-    "📄 Neural Document Processor", 
-    "🧠 Quantum Code Analyzer", 
-    "🤖 AI Detection Matrix", 
-    "🌐 URL Data Extraction"
+    "📄 Document Processor", 
+    "🧠 Code Analyzer", 
+    "🤖 AI Detection", 
+    "🌐 URL Extractor"
 ])
 
-# Document Summarizer tab
+# Tab 1: Document Processor
 with tabs[0]:
-    st.markdown("### 🔬 Advanced Document Analysis Engine")
-    st.markdown("*Leverage neural algorithms for intelligent content summarization*")
+    st.header("📄 Neural Document Processor")
+    st.write("*Advanced text analysis and summarization*")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        doc_text = st.text_area("📝 Input Text Data", height=200, key="doc_text_input", 
-                               placeholder="Paste your document content here...")
+        doc_text = st.text_area(
+            "Input Text", 
+            height=200, 
+            placeholder="Paste your document content here..."
+        )
     
     with col2:
-        doc_file = st.file_uploader("📁 Upload Document", type=["txt", "md", "pdf"], key="doc_file_upload")
-        doc_url = st.text_input("🔗 Source URL", key="doc_url_input", placeholder="https://...")
-    
-    col3, col4 = st.columns(2)
-    with col3:
-        doc_len = st.slider("🎯 Summary Precision", 1, 12, 5, key="doc_summary_len", 
-                           help="Number of key sentences to extract")
-    with col4:
-        doc_bullets = st.checkbox("📋 Bullet Format", value=False, key="doc_as_bullets")
+        doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"])
+        doc_url = st.text_input("Document URL", placeholder="https://...")
+        doc_length = st.slider("Summary Length", 1, 10, 5)
+        doc_bullets = st.checkbox("Use Bullets", value=False)
 
-    if st.button("🚀 INITIATE ANALYSIS", key="doc_summarize_btn", type="primary"):
+    if st.button("🚀 Analyze Document", type="primary"):
         content = ""
+        
+        # Get content from various sources
         if doc_file:
-            fn = getattr(doc_file, "name", "")
-            if fn.lower().endswith(".pdf"):
-                if PyPDF2 is None:
-                    st.error("⚠️ PDF processing requires PyPDF2. Install with 'pip install PyPDF2'")
+            if doc_file.name.lower().endswith(".pdf"):
+                if not PDF_AVAILABLE:
+                    st.error("PDF processing requires PyPDF2. Install with: pip install PyPDF2")
                 else:
                     try:
-                        with st.spinner("🔄 Processing PDF..."):
-                            reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
-                            pages_text = []
-                            for p in reader.pages:
-                                pages_text.append(p.extract_text() or "")
-                            content = "\n".join(pages_text)
+                        reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
+                        pages_text = []
+                        for page in reader.pages:
+                            pages_text.append(page.extract_text() or "")
+                        content = "\n".join(pages_text)
                     except Exception as e:
-                        st.error(f"❌ PDF extraction failed: {e}")
-                        content = ""
+                        st.error(f"PDF error: {e}")
             else:
-                try:
-                    content = doc_file.read().decode("utf-8", errors="ignore")
-                except Exception:
-                    content = doc_file.read().decode("latin-1", errors="ignore")
+                content = doc_file.read().decode("utf-8", errors="ignore")
         elif doc_url.strip():
-            with st.spinner("🌐 Fetching content..."):
+            with st.spinner("Fetching content..."):
                 content = fetch_from_url(doc_url.strip())
         elif doc_text.strip():
             content = doc_text
 
         if not content:
-            st.warning("⚠️ Please provide content via text, file upload, or URL.")
+            st.warning("Please provide content via text, file, or URL.")
+        elif content.startswith("❌"):
+            st.error(content)
         else:
-            with st.spinner("🧠 Processing with neural algorithms..."):
-                summary = summarize_text_advanced(content, max_sentences=doc_len, as_bullets=doc_bullets)
+            with st.spinner("Processing..."):
+                summary = summarize_text_advanced(content, doc_length, doc_bullets)
             
-            with st.expander("📊 ANALYSIS RESULTS", expanded=True):
-                st.markdown("#### 🎯 Intelligent Summary")
+            st.success("Analysis Complete!")
+            
+            with st.expander("📊 Results", expanded=True):
+                st.subheader("Summary")
                 if doc_bullets:
                     st.markdown(summary)
                 else:
                     st.write(summary)
                 
-                st.markdown("---")
                 col1, col2 = st.columns(2)
                 with col1:
-                    copy_button(summary, label="Copy Results", key="doc_summary_copy")
+                    copy_button(summary, "Copy Summary")
                 with col2:
-                    st.download_button("💾 Export Summary", summary.encode("utf-8"), 
-                                     "neural_summary.txt", key="doc_summary_download")
+                    st.download_button(
+                        "💾 Download", 
+                        summary.encode("utf-8"), 
+                        "summary.txt"
+                    )
 
-# Code Analyzer tab
+# Tab 2: Code Analyzer
 with tabs[1]:
-    st.markdown("### ⚡ Quantum Code Analysis System")
-    st.markdown("*Deep structural analysis with predictive error detection*")
+    st.header("🧠 Quantum Code Analyzer")
+    st.write("*Deep code analysis and optimization recommendations*")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        code_text = st.text_area("💻 Code Input", height=250, key="code_text_input",
-                                placeholder="Paste your Python code here...")
+        code_text = st.text_area(
+            "Python Code", 
+            height=250, 
+            placeholder="Paste your Python code here..."
+        )
     
     with col2:
-        code_file = st.file_uploader("📂 Upload Python File", type=["py"], key="code_file_upload")
-        code_url = st.text_input("🔗 Code Repository URL", key="code_url_input", placeholder="https://...")
-        code_len = st.slider("📈 Analysis Depth", 1, 8, 4, key="code_summary_len")
+        code_file = st.file_uploader("Upload Python File", type=["py"])
+        code_url = st.text_input("Code URL", placeholder="https://...")
 
-    if st.button("🔍 EXECUTE ANALYSIS", key="code_analyze_btn", type="primary"):
-        code_str = ""
+    if st.button("🔍 Analyze Code", type="primary"):
+        code_content = ""
+        
         if code_file:
-            try:
-                code_str = code_file.read().decode("utf-8", errors="ignore")
-            except Exception:
-                code_str = code_file.read().decode("latin-1", errors="ignore")
+            code_content = code_file.read().decode("utf-8", errors="ignore")
         elif code_url.strip():
-            with st.spinner("⬇️ Downloading code..."):
-                code_str = fetch_from_url(code_url.strip())
+            with st.spinner("Fetching code..."):
+                code_content = fetch_from_url(code_url.strip())
         elif code_text.strip():
-            code_str = code_text
+            code_content = code_text
 
-        if not code_str:
-            st.warning("⚠️ Please provide code via input, file upload, or URL.")
+        if not code_content:
+            st.warning("Please provide code via input, file, or URL.")
+        elif code_content.startswith("❌"):
+            st.error(code_content)
         else:
-            with st.expander("🖥️ CODE PREVIEW", expanded=False):
-                st.code(code_str, language="python")
+            with st.expander("Code Preview", expanded=False):
+                st.code(code_content, language="python")
 
-            with st.spinner("🧬 Analyzing code structure..."):
-                report = analyze_python(code_str)
+            with st.spinner("Analyzing..."):
+                report = analyze_python(code_content)
 
-            # Results in enhanced layout
+            st.success("Analysis Complete!")
+
             col1, col2 = st.columns(2)
             
             with col1:
-                with st.expander("🎯 PURPOSE ANALYSIS", expanded=True):
-                    st.write(report["purpose_summary"])
-                    copy_button(report["purpose_summary"], label="Copy Analysis", key="code_purpose_copy")
+                st.subheader("📋 Summary")
+                st.write(report["purpose_summary"])
                 
-                with st.expander("❌ CRITICAL ERRORS"):
-                    if report["errors"]:
-                        for e in report["errors"]:
-                            st.error(f"🚨 {e}")
-                    else:
-                        st.success("✅ No syntax errors detected")
+                st.subheader("❌ Errors")
+                if report["errors"]:
+                    for error in report["errors"]:
+                        st.error(error)
+                else:
+                    st.success("No syntax errors found!")
             
             with col2:
-                with st.expander("⚠️ OPTIMIZATION ALERTS"):
-                    if report["warnings"]:
-                        for w in report["warnings"]:
-                            st.warning(f"⚡ {w}")
-                    else:
-                        st.success("✅ Code structure optimal")
+                st.subheader("⚠️ Warnings")
+                if report["warnings"]:
+                    for warning in report["warnings"]:
+                        st.warning(warning)
+                else:
+                    st.success("No warnings!")
                 
-                with st.expander("💡 ENHANCEMENT RECOMMENDATIONS"):
-                    if report["fixes"]:
-                        for f in report["fixes"]:
-                            st.info(f"🔧 {f}")
-                    else:
-                        st.success("✅ No improvements suggested")
+                st.subheader("💡 Recommendations")
+                for fix in report["fixes"]:
+                    st.info(fix)
             
-            st.markdown("---")
+            # Copy and download options
             col3, col4 = st.columns(2)
             with col3:
-                copy_button(str(report), label="Copy Full Report", key="code_full_report_copy")
+                copy_button(str(report), "Copy Report")
             with col4:
-                st.download_button("💾 Export Analysis", str(report).encode("utf-8"), 
-                                 "quantum_analysis.txt", key="code_full_report_download")
+                st.download_button(
+                    "💾 Download Report", 
+                    str(report).encode("utf-8"), 
+                    "code_analysis.txt"
+                )
 
-# AI vs Human Scanner tab
+# Tab 3: AI Detection
 with tabs[2]:
-    st.markdown("### 🧠 AI Detection Matrix")
-    st.markdown("*Advanced pattern recognition for authorship analysis*")
+    st.header("🤖 AI Detection Matrix")
+    st.write("*Pattern recognition for AI-generated content*")
     
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        ai_text = st.text_area("🔍 Content Analysis", height=200, key="ai_text_input",
-                              placeholder="Paste text or code for AI detection analysis...")
+        ai_text = st.text_area(
+            "Content for Analysis", 
+            height=200, 
+            placeholder="Paste text or code to analyze..."
+        )
     
     with col2:
-        ai_file = st.file_uploader("📁 Upload File", type=["txt", "md", "py", "pdf"], key="ai_file_upload")
-        ai_url = st.text_input("🌐 Content URL", key="ai_url_input", placeholder="https://...")
-        ai_mode = st.radio("🎯 Analysis Mode", ["🤖 Auto-detect", "📝 Text Mode", "💻 Code Mode"], 
-                          index=0, key="ai_mode_radio")
+        ai_file = st.file_uploader("Upload File", type=["txt", "py", "md"])
+        ai_url = st.text_input("Content URL", placeholder="https://...")
 
-    if st.button("🔬 SCAN FOR AI PATTERNS", key="ai_detect_btn", type="primary"):
+    if st.button("🔬 Scan for AI Patterns", type="primary"):
         content = ""
+        
         if ai_file:
-            fn = getattr(ai_file, "name", "")
-            if fn.lower().endswith(".pdf"):
-                if PyPDF2 is None:
-                    st.error("⚠️ PDF processing requires PyPDF2")
-                else:
-                    try:
-                        with st.spinner("📖 Reading PDF..."):
-                            reader = PyPDF2.PdfReader(io.BytesIO(ai_file.read()))
-                            pages_text = []
-                            for p in reader.pages:
-                                pages_text.append(p.extract_text() or "")
-                            content = "\n".join(pages_text)
-                    except Exception as e:
-                        st.error(f"❌ PDF processing error: {e}")
-                        content = ""
-            else:
-                try:
-                    content = ai_file.read().decode("utf-8", errors="ignore")
-                except Exception:
-                    content = ai_file.read().decode("latin-1", errors="ignore")
+            content = ai_file.read().decode("utf-8", errors="ignore")
         elif ai_url.strip():
-            with st.spinner("⬇️ Fetching content..."):
+            with st.spinner("Fetching content..."):
                 content = fetch_from_url(ai_url.strip())
         elif ai_text.strip():
             content = ai_text
 
         if not content:
-            st.warning("⚠️ Please provide content for analysis.")
+            st.warning("Please provide content for analysis.")
+        elif content.startswith("❌"):
+            st.error(content)
         else:
-            with st.spinner("🔍 Analyzing patterns..."):
+            with st.spinner("Analyzing patterns..."):
                 result = detect_ai_generated_code(content)
             
-            # Enhanced results display
+            st.success("Analysis Complete!")
+            
+            # Display results
             score_color = "🟢" if result['score'] < 45 else "🟡" if result['score'] < 65 else "🔴"
             
-            with st.expander(f"{score_color} DETECTION RESULTS: {result['label']} (Confidence: {result['score']}%)", expanded=True):
+            with st.expander(f"{score_color} Detection Results", expanded=True):
+                col1, col2, col3 = st.columns(3)
                 
-                # Score visualization
-                col1, col2, col3 = st.columns([1, 2, 1])
                 with col2:
-                    st.metric("🎯 AI Likelihood Score", f"{result['score']}%", 
-                             delta=f"{result['score'] - 50}% vs baseline")
+                    st.metric(
+                        "AI Likelihood Score", 
+                        f"{result['score']}%",
+                        delta=f"{result['score'] - 50}% vs baseline"
+                    )
                 
-                st.markdown("---")
+                st.markdown(f"**Assessment:** {result['label']}")
                 
-                # Pattern analysis
+                if result["reasons"]:
+                    st.subheader("🔍 Key Indicators")
+                    for reason in result["reasons"]:
+                        st.write(f"• {reason}")
+                else:
+                    st.success("No significant AI patterns detected")
+                
+                st.subheader("📊 Feature Analysis")
+                for feature, value in result["features"].items():
+                    feature_name = feature.replace("_", " ").title()
+                    st.write(f"• {feature_name}: `{value:.3f}`")
+                
+                # Copy and download
                 col4, col5 = st.columns(2)
-                
                 with col4:
-                    st.markdown("**🔍 Pattern Indicators:**")
-                    if result["reasons"]:
-                        for r in result["reasons"]:
-                            st.markdown(f"• {r}")
-                    else:
-                        st.markdown("• No significant AI patterns detected")
-                
+                    copy_button(str(result), "Copy Results")
                 with col5:
-                    st.markdown("**📊 Feature Analysis:**")
-                    for k, v in result["features"].items():
-                        formatted_key = k.replace("_", " ").title()
-                        st.markdown(f"• {formatted_key}: `{v:.3f}`")
-                
-                st.markdown("---")
-                col6, col7 = st.columns(2)
-                with col6:
-                    copy_button(str(result), label="Copy Analysis", key="ai_result_copy")
-                with col7:
-                    st.download_button("💾 Export Results", str(result).encode("utf-8"), 
-                                     "ai_detection.txt", key="ai_result_download")
+                    st.download_button(
+                        "💾 Download Analysis", 
+                        str(result).encode("utf-8"), 
+                        "ai_detection.txt"
+                    )
 
-# URL Fetch & Explain tab
+# Tab 4: URL Extractor
 with tabs[3]:
-    st.markdown("### 🌐 URL Data Extraction Engine")
-    st.markdown("*Advanced web content analysis and summarization*")
+    st.header("🌐 URL Data Extraction Engine")
+    st.write("*Advanced web content extraction and analysis*")
     
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        url_input = st.text_input("🔗 Target URL", key="url_fetch_input",
-                                 placeholder="Enter any URL for content extraction...")
+        url_input = st.text_input(
+            "Target URL", 
+            placeholder="Enter any URL for content extraction..."
+        )
     
     with col2:
-        url_len = st.slider("📏 Summary Length", 1, 12, 6, key="url_summary_len")
-        url_bullets = st.checkbox("📋 Bullet Points", value=True, key="url_as_bullets")
+        url_length = st.slider("Summary Length", 1, 10, 5)
+        url_bullets = st.checkbox("Use Bullets", value=True)
 
-    if st.button("🚀 EXTRACT & ANALYZE", key="url_fetch_btn", type="primary"):
+    if st.button("🚀 Extract & Analyze", type="primary"):
         if not url_input.strip():
-            st.warning("⚠️ Please enter a valid URL.")
+            st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("🌐 Extracting content..."):
+            with st.spinner("Extracting content..."):
                 content = fetch_from_url(url_input.strip())
             
-            if content.startswith("❌ Error"):
+            if content.startswith("❌"):
                 st.error(content)
             else:
-                col1, col2 = st.columns([2, 1])
+                st.success("Content extracted successfully!")
                 
-                with col2:
-                    st.markdown("**📊 Content Metrics:**")
-                    st.metric("📝 Characters", f"{len(content):,}")
-                    st.metric("📄 Words", f"{len(content.split()):,}")
-                    st.metric("📏 Lines", f"{len(content.splitlines()):,}")
-                
+                # Show metrics
+                col1, col2, col3 = st.columns(3)
                 with col1:
-                    with st.expander("📄 RAW CONTENT PREVIEW", expanded=False):
-                        st.code(content[:4000] + ("..." if len(content) > 4000 else ""), language="text")
+                    st.metric("Characters", f"{len(content):,}")
+                with col2:
+                    st.metric("Words", f"{len(content.split()):,}")
+                with col3:
+                    st.metric("Lines", f"{len(content.splitlines()):,}")
                 
-                with st.spinner("🧠 Generating intelligent summary..."):
-                    summary = summarize_text_advanced(content, max_sentences=url_len, as_bullets=url_bullets)
+                # Show preview
+                with st.expander("📄 Content Preview", expanded=False):
+                    preview = content[:2000] + "..." if len(content) > 2000 else content
+                    st.text(preview)
                 
-                with st.expander("🎯 CONTENT ANALYSIS", expanded=True):
-                    st.markdown("#### 📊 Intelligent Summary")
-                    if url_bullets:
-                        st.markdown(summary)
-                    else:
-                        st.write(summary)
-                    
-                    st.markdown("---")
-                    col3, col4 = st.columns(2)
-                    with col3:
-                        copy_button(summary, label="Copy Summary", key="url_summary_copy")
-                    with col4:
-                        st.download_button("💾 Export Analysis", summary.encode("utf-8"), 
-                                         "url_analysis.txt", key="url_summary_download")
+                # Generate summary
+                with st.spinner("Generating summary..."):
+                    summary = summarize_text_advanced(content, url_length, url_bullets)
+                
+                st.subheader("📊 Content Summary")
+                if url_bullets:
+                    st.markdown(summary)
+                else:
+                    st.write(summary)
+                
+                # Copy and download
+                col4, col5 = st.columns(2)
+                with col4:
+                    copy_button(summary, "Copy Summary")
+                with col5:
+                    st.download_button(
+                        "💾 Download Summary", 
+                        summary.encode("utf-8"), 
+                        "url_summary.txt"
+                    )
 
 # Footer
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; padding: 20px; font-family: 'Orbitron', monospace; color: rgba(0, 249, 255, 0.6);">
-    <small>🌌 TECHNOVA AI NEXUS v2.0 • Advanced Neural Processing Suite</small>
+<div style="text-align: center; padding: 20px; color: rgba(0, 249, 255, 0.6); font-family: monospace;">
+    🌌 TECHNOVA AI NEXUS v2.0 • Advanced Neural Processing Suite
 </div>
 """, unsafe_allow_html=True)
-
