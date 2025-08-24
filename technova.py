@@ -894,7 +894,6 @@
 
 
 
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -1359,8 +1358,9 @@ with tabs[0]:
                 with col2:
                     st.download_button(
                         "💾 Download", 
-                        summary.encode("utf-8"), 
+                        summary, 
                         "summary.txt",
+                        mime="text/plain",
                         key="doc_download_btn"
                     )
 
@@ -1439,8 +1439,9 @@ with tabs[1]:
             with col4:
                 st.download_button(
                     "💾 Download Report", 
-                    str(report).encode("utf-8"), 
+                    str(report), 
                     "code_analysis.txt",
+                    mime="text/plain",
                     key="code_download_btn"
                 )
 
@@ -1518,8 +1519,9 @@ with tabs[2]:
                 with col5:
                     st.download_button(
                         "💾 Download Analysis", 
-                        str(result).encode("utf-8"), 
+                        str(result), 
                         "ai_detection.txt",
+                        mime="text/plain",
                         key="ai_download_btn"
                     )
 
@@ -1596,4 +1598,3 @@ st.markdown("""
     🌌 TECHNOVA AI NEXUS v2.0 • Advanced Neural Processing Suite
 </div>
 """, unsafe_allow_html=True)
-
