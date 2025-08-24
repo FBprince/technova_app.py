@@ -895,7 +895,6 @@
 
 
 
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -1302,16 +1301,17 @@ with tabs[0]:
         doc_text = st.text_area(
             "Input Text", 
             height=200, 
-            placeholder="Paste your document content here..."
+            placeholder="Paste your document content here...",
+            key="doc_text_input"
         )
     
     with col2:
-        doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"])
-        doc_url = st.text_input("Document URL", placeholder="https://...")
-        doc_length = st.slider("Summary Length", 1, 10, 5)
-        doc_bullets = st.checkbox("Use Bullets", value=False)
+        doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"], key="doc_file_upload")
+        doc_url = st.text_input("Document URL", placeholder="https://...", key="doc_url_input")
+        doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
+        doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
 
-    if st.button("🚀 Analyze Document", type="primary"):
+    if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
         content = ""
         
         # Get content from various sources
@@ -1355,12 +1355,13 @@ with tabs[0]:
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    copy_button(summary, "Copy Summary")
+                    copy_button(summary, "Copy Summary", key="doc_copy_btn")
                 with col2:
                     st.download_button(
                         "💾 Download", 
                         summary.encode("utf-8"), 
-                        "summary.txt"
+                        "summary.txt",
+                        key="doc_download_btn"
                     )
 
 # Tab 2: Code Analyzer
@@ -1374,14 +1375,15 @@ with tabs[1]:
         code_text = st.text_area(
             "Python Code", 
             height=250, 
-            placeholder="Paste your Python code here..."
+            placeholder="Paste your Python code here...",
+            key="code_text_input"
         )
     
     with col2:
-        code_file = st.file_uploader("Upload Python File", type=["py"])
-        code_url = st.text_input("Code URL", placeholder="https://...")
+        code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
+        code_url = st.text_input("Code URL", placeholder="https://...", key="code_url_input")
 
-    if st.button("🔍 Analyze Code", type="primary"):
+    if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
         code_content = ""
         
         if code_file:
@@ -1433,12 +1435,13 @@ with tabs[1]:
             # Copy and download options
             col3, col4 = st.columns(2)
             with col3:
-                copy_button(str(report), "Copy Report")
+                copy_button(str(report), "Copy Report", key="code_copy_btn")
             with col4:
                 st.download_button(
                     "💾 Download Report", 
                     str(report).encode("utf-8"), 
-                    "code_analysis.txt"
+                    "code_analysis.txt",
+                    key="code_download_btn"
                 )
 
 # Tab 3: AI Detection
@@ -1452,14 +1455,15 @@ with tabs[2]:
         ai_text = st.text_area(
             "Content for Analysis", 
             height=200, 
-            placeholder="Paste text or code to analyze..."
+            placeholder="Paste text or code to analyze...",
+            key="ai_text_input"
         )
     
     with col2:
-        ai_file = st.file_uploader("Upload File", type=["txt", "py", "md"])
-        ai_url = st.text_input("Content URL", placeholder="https://...")
+        ai_file = st.file_uploader("Upload File", type=["txt", "py", "md"], key="ai_file_upload")
+        ai_url = st.text_input("Content URL", placeholder="https://...", key="ai_url_input")
 
-    if st.button("🔬 Scan for AI Patterns", type="primary"):
+    if st.button("🔬 Scan for AI Patterns", type="primary", key="ai_analyze_btn"):
         content = ""
         
         if ai_file:
@@ -1510,12 +1514,13 @@ with tabs[2]:
                 # Copy and download
                 col4, col5 = st.columns(2)
                 with col4:
-                    copy_button(str(result), "Copy Results")
+                    copy_button(str(result), "Copy Results", key="ai_copy_btn")
                 with col5:
                     st.download_button(
                         "💾 Download Analysis", 
                         str(result).encode("utf-8"), 
-                        "ai_detection.txt"
+                        "ai_detection.txt",
+                        key="ai_download_btn"
                     )
 
 # Tab 4: URL Extractor
@@ -1528,14 +1533,15 @@ with tabs[3]:
     with col1:
         url_input = st.text_input(
             "Target URL", 
-            placeholder="Enter any URL for content extraction..."
+            placeholder="Enter any URL for content extraction...",
+            key="url_input_field"
         )
     
     with col2:
-        url_length = st.slider("Summary Length", 1, 10, 5)
-        url_bullets = st.checkbox("Use Bullets", value=True)
+        url_length = st.slider("Summary Length", 1, 10, 5, key="url_summary_length")
+        url_bullets = st.checkbox("Use Bullets", value=True, key="url_use_bullets")
 
-    if st.button("🚀 Extract & Analyze", type="primary"):
+    if st.button("🚀 Extract & Analyze", type="primary", key="url_analyze_btn"):
         if not url_input.strip():
             st.warning("Please enter a valid URL.")
         else:
@@ -1574,12 +1580,13 @@ with tabs[3]:
                 # Copy and download
                 col4, col5 = st.columns(2)
                 with col4:
-                    copy_button(summary, "Copy Summary")
+                    copy_button(summary, "Copy Summary", key="url_copy_btn")
                 with col5:
                     st.download_button(
                         "💾 Download Summary", 
                         summary.encode("utf-8"), 
-                        "url_summary.txt"
+                        "url_summary.txt",
+                        key="url_download_btn"
                     )
 
 # Footer
@@ -1589,3 +1596,4 @@ st.markdown("""
     🌌 TECHNOVA AI NEXUS v2.0 • Advanced Neural Processing Suite
 </div>
 """, unsafe_allow_html=True)
+
