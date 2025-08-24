@@ -894,6 +894,750 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# import streamlit as st
+# import requests
+# from bs4 import BeautifulSoup
+# import re
+# import base64
+# import ast
+# from collections import Counter
+# import io
+
+# # PDF extraction (optional)
+# try:
+#     import PyPDF2
+#     PDF_AVAILABLE = True
+# except ImportError:
+#     PDF_AVAILABLE = False
+
+# # Page config
+# st.set_page_config(
+#     page_title="Technova AI Nexus", 
+#     layout="wide", 
+#     initial_sidebar_state="collapsed"
+# )
+
+# # Enhanced copy button
+# def copy_button(text: str, label: str = "Copy", key: str = None):
+#     """Enhanced copy button with styling"""
+#     if text is None:
+#         text = ""
+#     safe_b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
+#     el_id = f"copy-btn-{key}" if key else f"copy-btn-{abs(hash(text))}"
+    
+#     html = f"""
+#     <button id="{el_id}" onclick="navigator.clipboard.writeText(atob('{safe_b64}'))"
+#         style="
+#             background: linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2));
+#             border: 1px solid rgba(0, 249, 255, 0.4);
+#             color: #00f9ff;
+#             padding: 8px 16px;
+#             border-radius: 8px;
+#             font-family: monospace;
+#             font-weight: bold;
+#             cursor: pointer;
+#             margin: 5px;
+#             transition: all 0.3s ease;
+#         "
+#         onmouseover="this.style.background='linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3))'"
+#         onmouseout="this.style.background='linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2))'">
+#         ⚡ {label}
+#     </button>
+#     <script>
+#     document.getElementById('{el_id}').addEventListener('click', function() {{
+#         const btn = this;
+#         const oldText = btn.innerHTML;
+#         btn.innerHTML = '✅ Copied!';
+#         btn.style.background = 'linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3))';
+#         setTimeout(() => {{
+#             btn.innerHTML = oldText;
+#             btn.style.background = 'linear-gradient(135deg, rgba(0, 249, 255, 0.1), rgba(0, 153, 204, 0.2))';
+#         }}, 1500);
+#     }});
+#     </script>
+#     """
+#     st.markdown(html, unsafe_allow_html=True)
+
+# # Simplified styling
+# def set_tech_styling():
+#     st.markdown("""
+#     <style>
+#     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;500&display=swap');
+    
+#     .stApp {
+#         background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+#         color: #00f9ff;
+#         font-family: 'Rajdhani', sans-serif;
+#     }
+    
+#     h1, h2, h3, h4, h5, h6 {
+#         font-family: 'Orbitron', monospace !important;
+#         color: #00f9ff !important;
+#         text-shadow: 0 0 10px rgba(0, 249, 255, 0.5);
+#     }
+    
+#     .main-title {
+#         font-size: 3rem;
+#         text-align: center;
+#         background: linear-gradient(45deg, #00f9ff, #0099cc, #66ccff);
+#         -webkit-background-clip: text;
+#         -webkit-text-fill-color: transparent;
+#         background-clip: text;
+#         margin: 2rem 0;
+#     }
+    
+#     .subtitle {
+#         text-align: center;
+#         color: rgba(0, 249, 255, 0.8);
+#         font-style: italic;
+#         margin-bottom: 2rem;
+#     }
+    
+#     .stTextArea textarea, .stTextInput input {
+#         background: rgba(0, 20, 40, 0.8) !important;
+#         border: 1px solid rgba(0, 249, 255, 0.3) !important;
+#         color: #00f9ff !important;
+#     }
+    
+#     .stButton > button {
+#         background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3)) !important;
+#         border: 1px solid rgba(0, 249, 255, 0.5) !important;
+#         color: #00f9ff !important;
+#         font-weight: bold !important;
+#     }
+    
+#     .stTabs [data-baseweb="tab"] {
+#         color: #00f9ff !important;
+#         font-family: 'Orbitron', monospace !important;
+#     }
+    
+#     .stExpander {
+#         border: 1px solid rgba(0, 249, 255, 0.3);
+#         border-radius: 10px;
+#     }
+#     </style>
+#     """, unsafe_allow_html=True)
+
+# # Initialize styling
+# set_tech_styling()
+
+# # Main title
+# st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+# st.markdown('<p class="subtitle">Advanced AI-Powered Analysis Suite</p>', unsafe_allow_html=True)
+
+# # Stopwords for summarization
+# STOPWORDS = set([
+#     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", 
+#     "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", 
+#     "there", "these", "they", "this", "to", "was", "will", "with", "you", "your", "from", 
+#     "our", "we", "he", "she", "his", "her", "its", "were", "been", "being", "than", 
+#     "also", "can", "could", "should", "would", "may", "might", "have", "has", "had", 
+#     "do", "does", "did", "done", "just", "over", "under", "more", "most", "other", 
+#     "some", "any", "each", "many", "few", "those", "them", "which", "who", "whom", 
+#     "whose", "where", "when", "why", "how"
+# ])
+
+# def safe_sentence_split(text: str):
+#     """Split text into sentences safely"""
+#     pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+#     return [s.strip() for s in pattern.split(text) if s.strip()]
+
+# def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool = False) -> str:
+#     """Advanced text summarization using frequency analysis"""
+#     if not text or not text.strip():
+#         return "No content to summarize."
+    
+#     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
+#     sentences = []
+#     for para in paragraphs:
+#         sentences.extend(safe_sentence_split(para))
+    
+#     if not sentences:
+#         return text
+
+#     # Word frequency analysis
+#     word_freq = Counter()
+#     for s in sentences:
+#         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+#         for w in words:
+#             if w not in STOPWORDS and len(w) > 2:
+#                 word_freq[w] += 1
+    
+#     if not word_freq:
+#         return " ".join(sentences[:max_sentences])
+
+#     # Normalize frequencies
+#     max_freq = max(word_freq.values())
+#     for w in list(word_freq.keys()):
+#         word_freq[w] /= max_freq
+
+#     # Score sentences
+#     scored = []
+#     for idx, s in enumerate(sentences):
+#         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+#         score = sum(word_freq.get(w, 0.0) for w in words)
+#         length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20) / 20)
+#         position_boost = 1.1 if idx < 3 else 1.0
+#         scored.append((score / length_penalty * position_boost, idx, s))
+
+#     # Select top sentences
+#     scored.sort(key=lambda x: (-x[0], x[1]))
+#     top = sorted(scored[:max_sentences], key=lambda x: x[1])
+    
+#     if as_bullets:
+#         return "\n".join([f"• {s}" for _, _, s in top])
+#     return " ".join([s for _, _, s in top])
+
+# def analyze_python(code: str):
+#     """Comprehensive Python code analysis"""
+#     report = {
+#         "functions": [], 
+#         "classes": [], 
+#         "imports": [], 
+#         "purpose_summary": "", 
+#         "errors": [], 
+#         "warnings": [], 
+#         "fixes": []
+#     }
+
+#     # Basic parsing
+#     for line in code.splitlines():
+#         l = line.strip()
+#         if l.startswith("def "):
+#             func_name = l.split("(")[0][4:].strip()
+#             report["functions"].append(func_name)
+#         elif l.startswith("class "):
+#             class_name = l.split("(")[0][6:].strip().rstrip(":")
+#             report["classes"].append(class_name)
+#         elif l.startswith("import ") or l.startswith("from "):
+#             report["imports"].append(l)
+
+#     # Generate purpose summary
+#     report["purpose_summary"] = summarize_text_advanced(code, max_sentences=3)
+
+#     # AST analysis for deeper insights
+#     try:
+#         tree = ast.parse(code)
+#     except SyntaxError as e:
+#         report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
+#         report["fixes"].append("Check syntax: indentation, colons, parentheses, quotes.")
+#         return report
+
+#     # Analyze AST
+#     imported_names = set()
+#     used_names = set()
+#     assigned_names = set()
+
+#     class CodeAnalyzer(ast.NodeVisitor):
+#         def visit_Import(self, node):
+#             for alias in node.names:
+#                 imported_names.add(alias.asname or alias.name.split(".")[0])
+#             self.generic_visit(node)
+
+#         def visit_ImportFrom(self, node):
+#             for alias in node.names:
+#                 imported_names.add(alias.asname or alias.name)
+#             self.generic_visit(node)
+
+#         def visit_FunctionDef(self, node):
+#             assigned_names.add(node.name)
+#             # Check for mutable default arguments
+#             for default in node.args.defaults:
+#                 if isinstance(default, (ast.List, ast.Dict, ast.Set)):
+#                     report["warnings"].append(f"Mutable default argument in '{node.name}'")
+#                     report["fixes"].append(f"Use None as default in '{node.name}' and create objects inside function")
+#             self.generic_visit(node)
+
+#         def visit_ClassDef(self, node):
+#             assigned_names.add(node.name)
+#             self.generic_visit(node)
+
+#         def visit_Name(self, node):
+#             if isinstance(node.ctx, ast.Load):
+#                 used_names.add(node.id)
+#             elif isinstance(node.ctx, ast.Store):
+#                 assigned_names.add(node.id)
+#             self.generic_visit(node)
+
+#         def visit_Call(self, node):
+#             if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec"}:
+#                 report["warnings"].append(f"Dangerous {node.func.id} usage detected")
+#                 report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
+#             self.generic_visit(node)
+
+#     CodeAnalyzer().visit(tree)
+
+#     # Check for unused imports
+#     for name in sorted(imported_names):
+#         if name not in used_names and name not in {"__future__"}:
+#             report["warnings"].append(f"Possibly unused import: '{name}'")
+#             report["fixes"].append(f"Remove unused import '{name}'")
+
+#     # Check for builtin shadowing
+#     builtins_list = [
+#         'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate', 
+#         'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input', 
+#         'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 
+#         'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round', 
+#         'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+#     ]
+    
+#     for name in assigned_names:
+#         if name in builtins_list:
+#             report["warnings"].append(f"Variable '{name}' shadows builtin")
+#             report["fixes"].append(f"Rename '{name}' to avoid shadowing builtins")
+
+#     # Add general recommendations
+#     if not report["errors"]:
+#         if not report["warnings"]:
+#             report["fixes"].append("Code looks good! Consider adding tests and documentation.")
+#         else:
+#             report["fixes"].append("Review warnings above and apply suggested fixes.")
+
+#     return report
+
+# def detect_ai_generated_code(code: str) -> dict:
+#     """Detect if code might be AI-generated based on patterns"""
+#     if not code or not code.strip():
+#         return {"score": 0, "label": "❓ No content", "reasons": [], "features": {}}
+    
+#     lines = code.splitlines()
+#     code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+#     comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
+    
+#     features = {}
+#     total_lines = max(1, len(lines))
+    
+#     # Comment density
+#     features["comment_density"] = len(comment_lines) / total_lines
+    
+#     # Repeated lines
+#     normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+#     counts = Counter(normalized)
+#     repeated = sum(c for c in counts.values() if c > 1)
+#     features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
+    
+#     # Generic variable names
+#     generic_names = {"data", "result", "temp", "value", "item", "input", "output", "res"}
+#     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
+#     generic_count = sum(1 for t in tokens if t in generic_names)
+#     features["generic_name_density"] = generic_count / max(1, len(tokens))
+    
+#     # Calculate score
+#     score = (
+#         25 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15) +
+#         35 * features["repeated_line_ratio"] +
+#         20 * min(1.0, features["generic_name_density"] * 20) +
+#         20 * (1.0 if len(code_lines) > 50 and features["comment_density"] < 0.05 else 0.0)
+#     )
+    
+#     score = max(0.0, min(100.0, score))
+    
+#     # Determine label
+#     if score >= 70:
+#         label = "🚨 Likely AI-generated"
+#     elif score >= 45:
+#         label = "🤔 Unclear/Mixed"
+#     else:
+#         label = "✅ Likely human-written"
+    
+#     # Generate reasons
+#     reasons = []
+#     if features["repeated_line_ratio"] > 0.1:
+#         reasons.append("High repetition of similar code patterns")
+#     if features["comment_density"] < 0.02 or features["comment_density"] > 0.4:
+#         reasons.append("Unusual comment density")
+#     if features["generic_name_density"] > 0.03:
+#         reasons.append("Frequent generic variable names")
+    
+#     return {
+#         "score": round(score, 1), 
+#         "label": label, 
+#         "reasons": reasons, 
+#         "features": features
+#     }
+
+# def fetch_from_url(url: str) -> str:
+#     """Fetch and extract text content from URL"""
+#     try:
+#         headers = {
+#             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+#         }
+#         resp = requests.get(url, timeout=10, headers=headers)
+#         resp.raise_for_status()
+        
+#         content_type = resp.headers.get("Content-Type", "")
+#         if "text/html" in content_type:
+#             soup = BeautifulSoup(resp.text, "html.parser")
+#             # Remove unwanted elements
+#             for element in soup(["script", "style", "nav", "header", "footer", "aside"]):
+#                 element.extract()
+#             return soup.get_text(separator="\n", strip=True)
+#         else:
+#             return resp.text
+            
+#     except requests.exceptions.RequestException as e:
+#         return f"❌ Error fetching URL: {str(e)}"
+#     except Exception as e:
+#         return f"❌ Error processing content: {str(e)}"
+
+# # Create tabs
+# tabs = st.tabs([
+#     "📄 Document Processor", 
+#     "🧠 Code Analyzer", 
+#     "🤖 AI Detection", 
+#     "🌐 URL Extractor"
+# ])
+
+# # Tab 1: Document Processor
+# with tabs[0]:
+#     st.header("📄 Neural Document Processor")
+#     st.write("*Advanced text analysis and summarization*")
+    
+#     col1, col2 = st.columns([2, 1])
+    
+#     with col1:
+#         doc_text = st.text_area(
+#             "Input Text", 
+#             height=200, 
+#             placeholder="Paste your document content here...",
+#             key="doc_text_input"
+#         )
+    
+#     with col2:
+#         doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"], key="doc_file_upload")
+#         doc_url = st.text_input("Document URL", placeholder="https://...", key="doc_url_input")
+#         doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
+#         doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
+
+#     if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
+#         content = ""
+        
+#         # Get content from various sources
+#         if doc_file:
+#             if doc_file.name.lower().endswith(".pdf"):
+#                 if not PDF_AVAILABLE:
+#                     st.error("PDF processing requires PyPDF2. Install with: pip install PyPDF2")
+#                 else:
+#                     try:
+#                         reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
+#                         pages_text = []
+#                         for page in reader.pages:
+#                             pages_text.append(page.extract_text() or "")
+#                         content = "\n".join(pages_text)
+#                     except Exception as e:
+#                         st.error(f"PDF error: {e}")
+#             else:
+#                 content = doc_file.read().decode("utf-8", errors="ignore")
+#         elif doc_url.strip():
+#             with st.spinner("Fetching content..."):
+#                 content = fetch_from_url(doc_url.strip())
+#         elif doc_text.strip():
+#             content = doc_text
+
+#         if not content:
+#             st.warning("Please provide content via text, file, or URL.")
+#         elif content.startswith("❌"):
+#             st.error(content)
+#         else:
+#             with st.spinner("Processing..."):
+#                 summary = summarize_text_advanced(content, doc_length, doc_bullets)
+            
+#             st.success("Analysis Complete!")
+            
+#             with st.expander("📊 Results", expanded=True):
+#                 st.subheader("Summary")
+#                 if doc_bullets:
+#                     st.markdown(summary)
+#                 else:
+#                     st.write(summary)
+                
+#                 col1, col2 = st.columns(2)
+#                 with col1:
+#                     copy_button(summary, "Copy Summary", key="doc_copy_btn")
+#                 with col2:
+#                     st.download_button(
+#                         "💾 Download", 
+#                         summary, 
+#                         "summary.txt",
+#                         mime="text/plain",
+#                         key="doc_download_btn"
+#                     )
+
+# # Tab 2: Code Analyzer
+# with tabs[1]:
+#     st.header("🧠 Quantum Code Analyzer")
+#     st.write("*Deep code analysis and optimization recommendations*")
+    
+#     col1, col2 = st.columns([2, 1])
+    
+#     with col1:
+#         code_text = st.text_area(
+#             "Python Code", 
+#             height=250, 
+#             placeholder="Paste your Python code here...",
+#             key="code_text_input"
+#         )
+    
+#     with col2:
+#         code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
+#         code_url = st.text_input("Code URL", placeholder="https://...", key="code_url_input")
+
+#     if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
+#         code_content = ""
+        
+#         if code_file:
+#             code_content = code_file.read().decode("utf-8", errors="ignore")
+#         elif code_url.strip():
+#             with st.spinner("Fetching code..."):
+#                 code_content = fetch_from_url(code_url.strip())
+#         elif code_text.strip():
+#             code_content = code_text
+
+#         if not code_content:
+#             st.warning("Please provide code via input, file, or URL.")
+#         elif code_content.startswith("❌"):
+#             st.error(code_content)
+#         else:
+#             with st.expander("Code Preview", expanded=False):
+#                 st.code(code_content, language="python")
+
+#             with st.spinner("Analyzing..."):
+#                 report = analyze_python(code_content)
+
+#             st.success("Analysis Complete!")
+
+#             col1, col2 = st.columns(2)
+            
+#             with col1:
+#                 st.subheader("📋 Summary")
+#                 st.write(report["purpose_summary"])
+                
+#                 st.subheader("❌ Errors")
+#                 if report["errors"]:
+#                     for error in report["errors"]:
+#                         st.error(error)
+#                 else:
+#                     st.success("No syntax errors found!")
+            
+#             with col2:
+#                 st.subheader("⚠️ Warnings")
+#                 if report["warnings"]:
+#                     for warning in report["warnings"]:
+#                         st.warning(warning)
+#                 else:
+#                     st.success("No warnings!")
+                
+#                 st.subheader("💡 Recommendations")
+#                 for fix in report["fixes"]:
+#                     st.info(fix)
+            
+#             # Copy and download options
+#             col3, col4 = st.columns(2)
+#             with col3:
+#                 copy_button(str(report), "Copy Report", key="code_copy_btn")
+#             with col4:
+#                 st.download_button(
+#                     "💾 Download Report", 
+#                     str(report), 
+#                     "code_analysis.txt",
+#                     mime="text/plain",
+#                     key="code_download_btn"
+#                 )
+
+# # Tab 3: AI Detection
+# with tabs[2]:
+#     st.header("🤖 AI Detection Matrix")
+#     st.write("*Pattern recognition for AI-generated content*")
+    
+#     col1, col2 = st.columns([3, 1])
+    
+#     with col1:
+#         ai_text = st.text_area(
+#             "Content for Analysis", 
+#             height=200, 
+#             placeholder="Paste text or code to analyze...",
+#             key="ai_text_input"
+#         )
+    
+#     with col2:
+#         ai_file = st.file_uploader("Upload File", type=["txt", "py", "md"], key="ai_file_upload")
+#         ai_url = st.text_input("Content URL", placeholder="https://...", key="ai_url_input")
+
+#     if st.button("🔬 Scan for AI Patterns", type="primary", key="ai_analyze_btn"):
+#         content = ""
+        
+#         if ai_file:
+#             content = ai_file.read().decode("utf-8", errors="ignore")
+#         elif ai_url.strip():
+#             with st.spinner("Fetching content..."):
+#                 content = fetch_from_url(ai_url.strip())
+#         elif ai_text.strip():
+#             content = ai_text
+
+#         if not content:
+#             st.warning("Please provide content for analysis.")
+#         elif content.startswith("❌"):
+#             st.error(content)
+#         else:
+#             with st.spinner("Analyzing patterns..."):
+#                 result = detect_ai_generated_code(content)
+            
+#             st.success("Analysis Complete!")
+            
+#             # Display results
+#             score_color = "🟢" if result['score'] < 45 else "🟡" if result['score'] < 65 else "🔴"
+            
+#             with st.expander(f"{score_color} Detection Results", expanded=True):
+#                 col1, col2, col3 = st.columns(3)
+                
+#                 with col2:
+#                     st.metric(
+#                         "AI Likelihood Score", 
+#                         f"{result['score']}%",
+#                         delta=f"{result['score'] - 50}% vs baseline"
+#                     )
+                
+#                 st.markdown(f"**Assessment:** {result['label']}")
+                
+#                 if result["reasons"]:
+#                     st.subheader("🔍 Key Indicators")
+#                     for reason in result["reasons"]:
+#                         st.write(f"• {reason}")
+#                 else:
+#                     st.success("No significant AI patterns detected")
+                
+#                 st.subheader("📊 Feature Analysis")
+#                 for feature, value in result["features"].items():
+#                     feature_name = feature.replace("_", " ").title()
+#                     st.write(f"• {feature_name}: `{value:.3f}`")
+                
+#                 # Copy and download
+#                 col4, col5 = st.columns(2)
+#                 with col4:
+#                     copy_button(str(result), "Copy Results", key="ai_copy_btn")
+#                 with col5:
+#                     st.download_button(
+#                         "💾 Download Analysis", 
+#                         str(result), 
+#                         "ai_detection.txt",
+#                         mime="text/plain",
+#                         key="ai_download_btn"
+#                     )
+
+# # Tab 4: URL Extractor
+# with tabs[3]:
+#     st.header("🌐 URL Data Extraction Engine")
+#     st.write("*Advanced web content extraction and analysis*")
+    
+#     col1, col2 = st.columns([3, 1])
+    
+#     with col1:
+#         url_input = st.text_input(
+#             "Target URL", 
+#             placeholder="Enter any URL for content extraction...",
+#             key="url_input_field"
+#         )
+    
+#     with col2:
+#         url_length = st.slider("Summary Length", 1, 10, 5, key="url_summary_length")
+#         url_bullets = st.checkbox("Use Bullets", value=True, key="url_use_bullets")
+
+#     if st.button("🚀 Extract & Analyze", type="primary", key="url_analyze_btn"):
+#         if not url_input.strip():
+#             st.warning("Please enter a valid URL.")
+#         else:
+#             with st.spinner("Extracting content..."):
+#                 content = fetch_from_url(url_input.strip())
+            
+#             if content.startswith("❌"):
+#                 st.error(content)
+#             else:
+#                 st.success("Content extracted successfully!")
+                
+#                 # Show metrics
+#                 col1, col2, col3 = st.columns(3)
+#                 with col1:
+#                     st.metric("Characters", f"{len(content):,}")
+#                 with col2:
+#                     st.metric("Words", f"{len(content.split()):,}")
+#                 with col3:
+#                     st.metric("Lines", f"{len(content.splitlines()):,}")
+                
+#                 # Show preview
+#                 with st.expander("📄 Content Preview", expanded=False):
+#                     preview = content[:2000] + "..." if len(content) > 2000 else content
+#                     st.text(preview)
+                
+#                 # Generate summary
+#                 with st.spinner("Generating summary..."):
+#                     summary = summarize_text_advanced(content, url_length, url_bullets)
+                
+#                 st.subheader("📊 Content Summary")
+#                 if url_bullets:
+#                     st.markdown(summary)
+#                 else:
+#                     st.write(summary)
+                
+#                 # Copy and download
+#                 col4, col5 = st.columns(2)
+#                 with col4:
+#                     copy_button(summary, "Copy Summary", key="url_copy_btn")
+#                 with col5:
+#                     st.download_button(
+#                         "💾 Download Summary", 
+#                         summary.encode("utf-8"), 
+#                         "url_summary.txt",
+#                         key="url_download_btn"
+#                     )
+
+# # Footer
+# st.markdown("---")
+# st.markdown("""
+# <div style="text-align: center; padding: 20px; color: rgba(0, 249, 255, 0.6); font-family: monospace;">
+#     🌌 TECHNOVA AI NEXUS v2.0 • Advanced Neural Processing Suite
+# </div>
+# """, unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -923,7 +1667,7 @@ def copy_button(text: str, label: str = "Copy", key: str = None):
     if text is None:
         text = ""
     safe_b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
-    el_id = f"copy-btn-{key}" if key else f"copy-btn-{abs(hash(text))}"
+    el_id = f"copy-btn-{key}" if key else f"copy-btn-{abs(hash(text[:100]))}"
     
     html = f"""
     <button id="{el_id}" onclick="navigator.clipboard.writeText(atob('{safe_b64}'))"
@@ -1586,8 +2330,9 @@ with tabs[3]:
                 with col5:
                     st.download_button(
                         "💾 Download Summary", 
-                        summary.encode("utf-8"), 
+                        summary, 
                         "url_summary.txt",
+                        mime="text/plain",
                         key="url_download_btn"
                     )
 
