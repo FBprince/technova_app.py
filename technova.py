@@ -5107,7 +5107,7 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     return " ".join([s for _, _, s in top])
 
 def fix_python_code(code: str) -> dict:
-    """Attempt to fix common Python code issues"""
+    """Enhanced Python code fixer - handles most common syntax errors accurately"""
     if not code or not code.strip():
         return {
             "success": False,
@@ -5117,84 +5117,1965 @@ def fix_python_code(code: str) -> dict:
             "remaining_errors": ["No code provided"]
         }
     
+    original_code = code
     fixed_code = code
     fixes_applied = []
     remaining_errors = []
     
-    # Check for syntax errors first
+    # Check if already correct
     try:
         ast.parse(code)
         return {
             "success": True,
             "original": code,
             "fixed": code,
-            "fixes_applied": ["Code is already syntactically correct!"],
+            "fixes_applied": ["✅ Code is already syntactically correct!"],
             "remaining_errors": []
         }
     except SyntaxError as e:
-        remaining_errors.append(f"SyntaxError: {e.msg} at line {e.lineno}")
+        remaining_errors.append(f"Initial error: {e.msg} at line {e.lineno}")
     
-    # Common fixes
-    lines = fixed_code.splitlines()
-    new_lines = []
+    # Multiple pass fixing
+    max_attempts = 5
+    attempt = 0
     
-    for i, line in enumerate(lines):
-        original_line = line
+    while attempt < max_attempts:
+        attempt += 1
+        lines = fixed_code.splitlines()
+        new_lines = []
+        made_changes = False
         
-        # Fix common indentation issues
-        if line and not line.startswith(' ') and not line.startswith('\t'):
-            # Check if this should be indented (after def, class, if, for, while, etc.)
-            if i > 0:
+        for i, line in enumerate(lines):
+            original_line = line
+            
+            # 1. Fix missing colons (most common error)
+            stripped = line.strip()
+            colon_keywords = ['if ', 'elif ', 'else', 'for ', 'while ', 'def ', 'class ', 'try', 'except', 'finally', 'with ']
+            
+            if any(stripped.startswith(kw) for kw in colon_keywords):
+                if not stripped.endswith(':') and ':' not in stripped.split('#')[0]:  # Ignore comments
+                    # Handle special cases
+                    if stripped == 'else' or stripped == 'try' or stripped == 'finally':
+                        line = line.rstrip() + ':'
+                        fixes_applied.append(f"Added colon after '{stripped}' at line {i+1}")
+                        made_changes = True
+                    elif not any(op in stripped for op in ['==', '!=', '>=', '<=', '<', '>']):  # Not comparison
+                        line = line.rstrip() + ':'
+                        fixes_applied.append(f"Added missing colon at line {i+1}")
+                        made_changes = True
+            
+            # 2. Fix indentation issues
+            if i > 0 and line.strip():
                 prev_line = lines[i-1].strip()
-                if (prev_line.endswith(':') and 
-                    any(prev_line.startswith(keyword) for keyword in ['def ', 'class ', 'if ', 'for ', 'while ', 'try:', 'except', 'else:', 'elif ', 'with '])):
-                    line = '    ' + line
-                    fixes_applied.append(f"Added indentation at line {i+1}")
+                current_indent = len(line) - len(line.lstrip())
+                
+                # Should be indented after colon
+                if prev_line.endswith(':') and current_indent == 0:
+                    if any(prev_line.startswith(kw) for kw in colon_keywords):
+                        line = '    ' + line
+                        fixes_applied.append(f"Added indentation after colon at line {i+1}")
+                        made_changes = True
+                
+                # Fix over-indentation
+                elif current_indent > 0 and not prev_line.endswith(':'):
+                    # Check if previous non-empty line needs this to be indented
+                    needs_indent = False
+                    for j in range(i-1, -1, -1):
+                        if lines[j].strip():
+                            if lines[j].strip().endswith(':'):
+                                needs_indent = True
+                            break
+                    
+                    if not needs_indent and current_indent == 4:
+                        line = line[4:]  # Remove one level of indentation
+                        fixes_applied.append(f"Fixed over-indentation at line {i+1}")
+                        made_changes = True
+            
+            # 3. Fix print statements (Python 3 style)
+            # Handle: print "hello" -> print("hello")
+            print_pattern = r'\bprint\s+([^(][^#]*?)(?:#.*)?
+
+def analyze_python_enhanced(code: str):
+    """Comprehensive Python code analysis with enhanced metrics"""
+    report = {
+        "basic_stats": {},
+        "functions": [],
+        "classes": [],
+        "imports": [],
+        "variables": [],
+        "purpose_summary": "",
+        "errors": [],
+        "warnings": [],
+        "fixes": [],
+        "complexity_metrics": {},
+        "code_quality": {},
+        "detailed_counts": {},
+        "builtin_functions_used": []
+    }
+    
+    if not code or not code.strip():
+        return report
+    
+    lines = code.splitlines()
+    code_lines = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+    comment_lines = [line for line in lines if line.strip().startswith("#")]
+    blank_lines = [line for line in lines if not line.strip()]
+    
+    # Basic statistics
+    report["basic_stats"] = {
+        "total_lines": len(lines),
+        "code_lines": len(code_lines),
+        "comment_lines": len(comment_lines),
+        "blank_lines": len(blank_lines),
+        "characters": len(code),
+        "words": len(code.split())
+    }
+    
+    # Initialize counters
+    function_count = 0
+    class_count = 0
+    import_count = 0
+    print_count = 0
+    if_count = 0
+    for_count = 0
+    while_count = 0
+    try_count = 0
+    with_count = 0
+    def_count = 0
+    lambda_count = 0
+    list_comp_count = 0
+    dict_comp_count = 0
+    
+    # Pattern-based counting
+    for line in code_lines:
+        stripped_line = line.strip()
         
-        # Fix missing colons
+        # Count various constructs
+        if stripped_line.startswith("def "):
+            def_count += 1
+        if stripped_line.startswith("class "):
+            class_count += 1
+        if stripped_line.startswith(("import ", "from ")):
+            import_count += 1
+        
+        # Count control structures and statements
+        print_count += len(re.findall(r'\bprint\s*\(', line))
+        if_count += len(re.findall(r'\bif\b', line))
+        for_count += len(re.findall(r'\bfor\b', line))
+        while_count += len(re.findall(r'\bwhile\b', line))
+        try_count += len(re.findall(r'\btry\b', line))
+        with_count += len(re.findall(r'\bwith\b', line))
+        lambda_count += len(re.findall(r'\blambda\b', line))
+        list_comp_count += len(re.findall(r'\[.*for.*in.*\]', line))
+        dict_comp_count += len(re.findall(r'\{.*for.*in.*\}', line))
+    
+    report["detailed_counts"] = {
+        "functions": def_count,
+        "classes": class_count,
+        "imports": import_count,
+        "print_statements": print_count,
+        "if_statements": if_count,
+        "for_loops": for_count,
+        "while_loops": while_count,
+        "try_blocks": try_count,
+        "with_statements": with_count,
+        "lambda_expressions": lambda_count,
+        "list_comprehensions": list_comp_count,
+        "dict_comprehensions": dict_comp_count
+    }
+    
+    # Calculate complexity metrics
+    total_constructs = sum([if_count, for_count, while_count, try_count, def_count])
+    complexity_score = total_constructs / max(1, len(code_lines)) * 100
+    
+    report["complexity_metrics"] = {
+        "cyclomatic_complexity_estimate": total_constructs + 1,
+        "complexity_per_line": round(complexity_score, 2),
+        "nesting_level_estimate": max(0, len(re.findall(r'    ', code)) // len(code_lines) * 10) if code_lines else 0
+    }
+    
+    # Code quality metrics
+    comment_ratio = len(comment_lines) / max(1, len(lines)) * 100
+    avg_line_length = sum(len(line) for line in code_lines) / max(1, len(code_lines))
+    
+    report["code_quality"] = {
+        "comment_ratio": round(comment_ratio, 2),
+        "avg_line_length": round(avg_line_length, 2),
+        "code_to_comment_ratio": round(len(code_lines) / max(1, len(comment_lines)), 2)
+    }
+    
+    # Basic parsing for simple analysis
+    for line in code_lines:
         stripped = line.strip()
-        if (stripped.startswith(('if ', 'elif ', 'else', 'for ', 'while ', 'def ', 'class ', 'try', 'except', 'finally')) 
-            and not stripped.endswith(':') and not ':' in stripped):
-            line = line.rstrip() + ':'
-            fixes_applied.append(f"Added missing colon at line {i+1}")
-        
-        # Fix common print statement issues
-        print_matches = re.findall(r'print\s+([^(].*)', line)
-        for match in print_matches:
-            if not match.strip().startswith('('):
-                new_line = line.replace(f'print {match}', f'print({match})')
-                if new_line != line:
-                    line = new_line
-                    fixes_applied.append(f"Fixed print statement at line {i+1}")
-        
-        # Fix unclosed strings (basic attempt)
-        quote_count = line.count('"') + line.count("'")
-        if quote_count % 2 != 0 and not line.strip().endswith('\\'):
-            if '"' in line and line.count('"') % 2 != 0:
-                line += '"'
-                fixes_applied.append(f"Added missing quote at line {i+1}")
-            elif "'" in line and line.count("'") % 2 != 0:
-                line += "'"
-                fixes_applied.append(f"Added missing quote at line {i+1}")
-        
-        new_lines.append(line)
+        if stripped.startswith("def "):
+            match = re.match(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)", stripped)
+            if match:
+                report["functions"].append(match.group(1))
+        elif stripped.startswith("class "):
+            match = re.match(r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)", stripped)
+            if match:
+                report["classes"].append(match.group(1))
+        elif stripped.startswith(("import ", "from ")):
+            report["imports"].append(stripped)
     
-    fixed_code = '\n'.join(new_lines)
+    # Generate purpose summary
+    report["purpose_summary"] = summarize_text_advanced(code, max_sentences=3)
     
-    # Check if fixes worked
+    # AST analysis for deeper insights
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
+        report["fixes"].append("Check syntax: indentation, colons, parentheses, quotes.")
+        return report
+    
+    # Enhanced AST analysis
+    imported_names = set()
+    used_names = set()
+    assigned_names = set()
+    builtin_functions_used = set()
+    
+    builtin_funcs = {
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate',
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input',
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct',
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round',
+        'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+    }
+    
+    class EnhancedCodeAnalyzer(ast.NodeVisitor):
+        def visit_Import(self, node):
+            for alias in node.names:
+                imported_names.add(alias.asname or alias.name.split(".")[0])
+            self.generic_visit(node)
+        
+        def visit_ImportFrom(self, node):
+            for alias in node.names:
+                imported_names.add(alias.asname or alias.name)
+            self.generic_visit(node)
+        
+        def visit_FunctionDef(self, node):
+            assigned_names.add(node.name)
+            # Check for mutable default arguments
+            for default in node.args.defaults:
+                if isinstance(default, (ast.List, ast.Dict, ast.Set)):
+                    report["warnings"].append(f"Mutable default argument in '{node.name}'")
+                    report["fixes"].append(f"Use None as default in '{node.name}' and create objects inside function")
+            
+            # Check for long functions
+            func_lines = len([n for n in ast.walk(node) if hasattr(n, 'lineno')])
+            if func_lines > 50:
+                report["warnings"].append(f"Function '{node.name}' is very long ({func_lines} lines)")
+                report["fixes"].append(f"Consider breaking down '{node.name}' into smaller functions")
+            
+            self.generic_visit(node)
+        
+        def visit_ClassDef(self, node):
+            assigned_names.add(node.name)
+            self.generic_visit(node)
+        
+        def visit_Name(self, node):
+            if isinstance(node.ctx, ast.Load):
+                used_names.add(node.id)
+                if node.id in builtin_funcs:
+                    builtin_functions_used.add(node.id)
+            elif isinstance(node.ctx, ast.Store):
+                assigned_names.add(node.id)
+                report["variables"].append(node.id)
+            self.generic_visit(node)
+        
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Name):
+                if node.func.id in {"eval", "exec"}:
+                    report["warnings"].append(f"Dangerous {node.func.id} usage detected")
+                    report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
+                elif node.func.id == "print" and len(node.args) == 0:
+                    report["warnings"].append("Empty print() statement found")
+                    report["fixes"].append("Remove empty print() or add meaningful content")
+            self.generic_visit(node)
+    
+    EnhancedCodeAnalyzer().visit(tree)
+    
+    # Add builtin functions used to report
+    report["builtin_functions_used"] = sorted(list(builtin_functions_used))
+    
+    # Check for unused imports
+    unused_imports = []
+    for name in sorted(imported_names):
+        if name not in used_names and name not in {"__future__"}:
+            unused_imports.append(name)
+            report["warnings"].append(f"Possibly unused import: '{name}'")
+            report["fixes"].append(f"Remove unused import '{name}' if not needed")
+    
+    # Check for builtin shadowing
+    builtins_list = [
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate',
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input',
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct',
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round',
+        'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+    ]
+    
+    shadowed_builtins = []
+    for name in assigned_names:
+        if name in builtins_list:
+            shadowed_builtins.append(name)
+            report["warnings"].append(f"Variable '{name}' shadows builtin")
+            report["fixes"].append(f"Rename '{name}' to avoid shadowing builtins")
+    
+    # Code quality analysis
+    if report["code_quality"]["comment_ratio"] < 5:
+        report["warnings"].append("Low comment density - consider adding more documentation")
+        report["fixes"].append("Add docstrings to functions and classes, and inline comments for complex logic")
+    
+    if report["code_quality"]["avg_line_length"] > 100:
+        report["warnings"].append("Some lines are very long - consider breaking them up")
+        report["fixes"].append("Break long lines at logical points (after commas, operators, etc.)")
+    
+    # Add general recommendations
+    if not report["errors"]:
+        if not report["warnings"]:
+            report["fixes"].append("🎉 Code looks excellent! Consider adding unit tests and type hints.")
+        else:
+            report["fixes"].append("Review warnings above and apply suggested fixes for better code quality.")
+    
+    # Remove duplicate variables
+    report["variables"] = sorted(list(set(report["variables"])))
+    
+    return report
+
+def detect_ai_generated_code(code: str) -> dict:
+    """Detect if code might be AI-generated based on patterns"""
+    if not code or not code.strip():
+        return {"score": 0, "label": "❓ No content", "reasons": [], "features": {}}
+    
+    lines = code.splitlines()
+    code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+    comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
+    
+    features = {}
+    total_lines = max(1, len(lines))
+    
+    # Comment density
+    features["comment_density"] = len(comment_lines) / total_lines
+    
+    # Repeated lines
+    normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+    counts = Counter(normalized)
+    repeated = sum(c for c in counts.values() if c > 1)
+    features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
+    
+    # Generic variable names
+    generic_names = {"data", "result", "temp", "value", "item", "input", "output", "res", "var", "obj"}
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
+    generic_count = sum(1 for t in tokens if t in generic_names)
+    features["generic_name_density"] = generic_count / max(1, len(tokens))
+    
+    # Perfect formatting (suspicious)
+    perfect_indent = all(len(line) - len(line.lstrip()) % 4 == 0 for line in code_lines if line.strip())
+    features["perfect_formatting"] = 1.0 if perfect_indent and len(code_lines) > 10 else 0.0
+    
+    # Calculate score
+    score = (
+        25 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15) +
+        35 * features["repeated_line_ratio"] +
+        20 * min(1.0, features["generic_name_density"] * 20) +
+        20 * features["perfect_formatting"]
+    )
+    
+    score = max(0.0, min(100.0, score))
+    
+    # Determine label
+    if score >= 70:
+        label = "🚨 Likely AI-generated"
+    elif score >= 45:
+        label = "🤔 Unclear/Mixed"
+    else:
+        label = "✅ Likely human-written"
+    
+    # Generate reasons
+    reasons = []
+    if features["repeated_line_ratio"] > 0.1:
+        reasons.append("High repetition of similar code patterns")
+    if features["comment_density"] < 0.02 or features["comment_density"] > 0.4:
+        reasons.append("Unusual comment density")
+    if features["generic_name_density"] > 0.03:
+        reasons.append("Frequent generic variable names")
+    if features["perfect_formatting"] == 1.0:
+        reasons.append("Suspiciously perfect code formatting")
+    
+    return {
+        "score": round(score, 1),
+        "label": label,
+        "reasons": reasons,
+        "features": features
+    }
+
+def fetch_from_url(url: str) -> str:
+    """Fetch and extract text content from URL"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        resp = requests.get(url, timeout=10, headers=headers)
+        resp.raise_for_status()
+        
+        content_type = resp.headers.get("Content-Type", "")
+        if "text/html" in content_type:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Remove unwanted elements
+            for element in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                element.extract()
+            return soup.get_text(separator="\n", strip=True)
+        else:
+            return resp.text
+        
+    except requests.exceptions.RequestException as e:
+        return f"❌ Error fetching URL: {str(e)}"
+    except Exception as e:
+        return f"❌ Error processing content: {str(e)}"
+
+# Create tabs
+tabs = st.tabs([
+    "📄 Document Processor",
+    "🧠 Code Analyzer", 
+    "🔧 Code Corrector",
+    "🤖 AI Detection",
+    "🌐 URL Extractor"
+])
+
+# Tab 1: Document Processor
+with tabs[0]:
+    st.header("📄 Neural Document Processor")
+    st.write("*Advanced text analysis and summarization*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        doc_text = st.text_area(
+            "Input Text",
+            height=200,
+            placeholder="Paste your document content here...",
+            key="doc_text_input"
+        )
+    
+    with col2:
+        doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"], key="doc_file_upload")
+        doc_url = st.text_input("Document URL", placeholder="https://...", key="doc_url_input")
+        doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
+        doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
+    
+    if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
+        content = ""
+        
+        # Get content from various sources
+        if doc_file:
+            if doc_file.name.lower().endswith(".pdf"):
+                if not PDF_AVAILABLE:
+                    st.error("PDF processing requires PyPDF2. Install with: pip install PyPDF2")
+                else:
+                    try:
+                        reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
+                        pages_text = []
+                        for page in reader.pages:
+                            pages_text.append(page.extract_text() or "")
+                        content = "\n".join(pages_text)
+                    except Exception as e:
+                        st.error(f"PDF error: {e}")
+            else:
+                content = doc_file.read().decode("utf-8", errors="ignore")
+        elif doc_url.strip():
+            with st.spinner("Fetching content..."):
+                content = fetch_from_url(doc_url.strip())
+        elif doc_text.strip():
+            content = doc_text
+        
+        if not content:
+            st.warning("Please provide content via text, file, or URL.")
+        elif content.startswith("❌"):
+            st.error(content)
+        else:
+            with st.spinner("Processing..."):
+                summary = summarize_text_advanced(content, doc_length, doc_bullets)
+            
+            st.success("Analysis Complete!")
+            
+            # Show summary FIRST (most important)
+            st.subheader("📋 Generated Summary")
+            if doc_bullets:
+                st.markdown(summary)
+            else:
+                st.write(summary)
+            
+            # Copy functionality for summary
+            st.subheader("📋 Copy Summary")
+            copy_button(summary, "Copy Summary", key="doc_summary")
+            
+            # Download button
+            st.subheader("💾 Download Summary")
+            download_button_enhanced(summary, "summary.txt", "Download Summary")
+            
+            # Then show document metrics
+            st.subheader("📊 Document Statistics")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Characters", f"{len(content):,}")
+            with col2:
+                st.metric("Words", f"{len(content.split()):,}")
+            with col3:
+                st.metric("Lines", f"{len(content.splitlines()):,}")
+            with col4:
+                st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
+
+# Tab 2: Enhanced Code Analyzer (removed URL input)
+with tabs[1]:
+    st.header("🧠 Quantum Code Analyzer")
+    st.write("*Deep code analysis with comprehensive metrics and optimization recommendations*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        code_text = st.text_area(
+            "Python Code",
+            height=250,
+            placeholder="Paste your Python code here...",
+            key="code_text_input"
+        )
+    
+    with col2:
+        code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
+    
+    if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
+        code_content = ""
+        
+        if code_file:
+            code_content = code_file.read().decode("utf-8", errors="ignore")
+        elif code_text.strip():
+            code_content = code_text
+        
+        if not code_content:
+            st.warning("Please provide code via input or file.")
+        else:
+            with st.expander("Code Preview", expanded=False):
+                st.code(code_content, language="python")
+            
+            with st.spinner("Analyzing code..."):
+                report = analyze_python_enhanced(code_content)
+            
+            st.success("🎉 Analysis Complete!")
+            
+            # PRIORITY SECTION 1: ERRORS (Most Important)
+            st.header("❌ Errors")
+            if report["errors"]:
+                for error in report["errors"]:
+                    st.error(error)
+            else:
+                st.success("✅ No syntax errors found!")
+            
+            # PRIORITY SECTION 2: WARNINGS
+            st.header("⚠️ Warnings")
+            if report["warnings"]:
+                for warning in report["warnings"]:
+                    st.warning(warning)
+            else:
+                st.success("✅ No warnings!")
+            
+            # PRIORITY SECTION 3: SUGGESTIONS/RECOMMENDATIONS
+            st.header("💡 Suggestions & Recommendations")
+            for fix in report["fixes"]:
+                st.info(fix)
+            
+            # PRIORITY SECTION 4: CODE SUMMARY
+            st.header("📋 Code Summary")
+            st.write(report["purpose_summary"])
+            
+            # Copy functionality for main analysis
+            st.header("📋 Copy Analysis Report")
+            formatted_report = f"""CODE ANALYSIS REPORT
+==================
+
+ERRORS ({len(report['errors'])} found):
+{chr(10).join(f"- {error}" for error in report['errors']) if report['errors'] else "✅ No errors"}
+
+WARNINGS ({len(report['warnings'])} found):
+{chr(10).join(f"- {warning}" for warning in report['warnings']) if report['warnings'] else "✅ No warnings"}
+
+RECOMMENDATIONS:
+{chr(10).join(f"- {fix}" for fix in report['fixes'])}
+
+CODE SUMMARY:
+{report['purpose_summary']}
+
+FUNCTIONS FOUND ({len(report['functions'])}):
+{', '.join(report['functions']) if report['functions'] else "None"}
+
+CLASSES FOUND ({len(report['classes'])}):
+{', '.join(report['classes']) if report['classes'] else "None"}
+
+DETAILED STATISTICS:
+- Total Lines: {report['basic_stats'].get('total_lines', 0)}
+- Code Lines: {report['basic_stats'].get('code_lines', 0)}
+- Comment Lines: {report['basic_stats'].get('comment_lines', 0)}
+- Functions: {report['detailed_counts'].get('functions', 0)}
+- Classes: {report['detailed_counts'].get('classes', 0)}
+- Imports: {report['detailed_counts'].get('imports', 0)}
+- Print Statements: {report['detailed_counts'].get('print_statements', 0)}
+- If Statements: {report['detailed_counts'].get('if_statements', 0)}
+- For Loops: {report['detailed_counts'].get('for_loops', 0)}
+- While Loops: {report['detailed_counts'].get('while_loops', 0)}"""
+
+            copy_button(formatted_report, "Copy Full Report", key="code_report")
+            
+            # Download button for report
+            st.subheader("💾 Download Report")
+            download_button_enhanced(formatted_report, "code_analysis_report.txt", "Download Report")
+            
+            # NOW SHOW DETAILED METRICS (Lower Priority)
+            st.header("📊 Detailed Code Metrics")
+            
+            # Functions and Classes Found
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if report["functions"]:
+                    st.subheader("🔧 Functions Found")
+                    for func in report["functions"][:10]:  # Show first 10
+                        st.write(f"• `{func}()`")
+                    if len(report["functions"]) > 10:
+                        st.write(f"... and {len(report['functions']) - 10} more")
+                
+                # SAFE ACCESS TO builtin_functions_used
+                builtin_functions = report.get("builtin_functions_used", [])
+                if builtin_functions:
+                    st.subheader("🐍 Built-in Functions Used")
+                    builtin_display = ", ".join(f"`{func}()`" for func in builtin_functions[:15])
+                    st.write(builtin_display)
+                    if len(builtin_functions) > 15:
+                        st.write(f"... and {len(builtin_functions) - 15} more")
+            
+            with col2:
+                if report["classes"]:
+                    st.subheader("🏗️ Classes Found")
+                    for cls in report["classes"]:
+                        st.write(f"• `{cls}`")
+                
+                if report["variables"]:
+                    st.subheader("📝 Variables")
+                    variables_display = ", ".join(f"`{var}`" for var in report["variables"][:20])
+                    st.write(variables_display)
+                    if len(report["variables"]) > 20:
+                        st.write(f"... and {len(report['variables']) - 20} more variables")
+            
+            # Basic Statistics Section
+            st.subheader("📈 Line Statistics")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Lines", report["basic_stats"].get("total_lines", 0))
+                st.metric("Functions", report["detailed_counts"].get("functions", 0))
+            with col2:
+                st.metric("Code Lines", report["basic_stats"].get("code_lines", 0))
+                st.metric("Classes", report["detailed_counts"].get("classes", 0))
+            with col3:
+                st.metric("Comments", report["basic_stats"].get("comment_lines", 0))
+                st.metric("Imports", report["detailed_counts"].get("imports", 0))
+            with col4:
+                st.metric("Characters", f"{report['basic_stats'].get('characters', 0):,}")
+                st.metric("Print Statements", report["detailed_counts"].get("print_statements", 0))
+            
+            # Detailed Counts Section
+            st.subheader("🔧 Code Constructs")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("If Statements", report["detailed_counts"].get("if_statements", 0))
+                st.metric("For Loops", report["detailed_counts"].get("for_loops", 0))
+            with col2:
+                st.metric("While Loops", report["detailed_counts"].get("while_loops", 0))
+                st.metric("Try Blocks", report["detailed_counts"].get("try_blocks", 0))
+            with col3:
+                st.metric("With Statements", report["detailed_counts"].get("with_statements", 0))
+                st.metric("Lambda Expressions", report["detailed_counts"].get("lambda_expressions", 0))
+            with col4:
+                st.metric("List Comprehensions", report["detailed_counts"].get("list_comprehensions", 0))
+                st.metric("Dict Comprehensions", report["detailed_counts"].get("dict_comprehensions", 0))
+            
+            # Code Quality Metrics
+            st.subheader("📊 Quality Metrics")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                comment_ratio = report["code_quality"].get("comment_ratio", 0)
+                st.metric("Comment Ratio", f"{comment_ratio:.1f}%")
+            
+            with col2:
+                avg_line_length = report["code_quality"].get("avg_line_length", 0)
+                st.metric("Avg Line Length", f"{avg_line_length:.1f} chars")
+            
+            with col3:
+                complexity = report["complexity_metrics"].get("cyclomatic_complexity_estimate", 0)
+                st.metric("Complexity Score", complexity)
+            
+            # Imports and Variables Details
+            with st.expander("📦 Imports & Variables Details", expanded=False):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if report["imports"]:
+                        st.subheader("📥 Imports")
+                        for imp in report["imports"]:
+                            st.code(imp, language="python")
+                    else:
+                        st.write("No imports found")
+                
+                with col2:
+                    if report["variables"]:
+                        st.subheader("📝 All Variables")
+                        st.write(", ".join(f"`{var}`" for var in report["variables"]))
+
+# Tab 3: NEW Code Corrector
+with tabs[2]:
+    st.header("🔧 AI Code Corrector")
+    st.write("*Automatically fix common Python syntax errors and issues*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        wrong_code = st.text_area(
+            "Problematic Python Code",
+            height=250,
+            placeholder="Paste your buggy or incorrect Python code here...",
+            key="wrong_code_input"
+        )
+    
+    with col2:
+        wrong_code_file = st.file_uploader("Upload Buggy Python File", type=["py"], key="wrong_code_file")
+        
+        st.info("🔧 **Auto-Fix Features:**\n"
+                "• Missing colons\n"
+                "• Indentation issues\n" 
+                "• Print statement syntax\n"
+                "• Unclosed quotes\n"
+                "• Common syntax errors")
+    
+    if st.button("🛠️ Fix Code", type="primary", key="fix_code_btn"):
+        code_to_fix = ""
+        
+        if wrong_code_file:
+            code_to_fix = wrong_code_file.read().decode("utf-8", errors="ignore")
+        elif wrong_code.strip():
+            code_to_fix = wrong_code
+        
+        if not code_to_fix:
+            st.warning("Please provide code to fix via input or file.")
+        else:
+            with st.spinner("🔧 Applying fixes..."):
+                fix_result = fix_python_code(code_to_fix)
+            
+            if fix_result["success"]:
+                st.success("✅ Code successfully fixed!")
+            else:
+                st.warning("⚠️ Partial fixes applied - some errors may remain")
+            
+            # Show fixes applied
+            st.subheader("🛠️ Fixes Applied")
+            for fix in fix_result["fixes_applied"]:
+                st.info(fix)
+            
+            # Show remaining errors if any
+            if fix_result["remaining_errors"]:
+                st.subheader("❌ Remaining Issues")
+                for error in fix_result["remaining_errors"]:
+                    st.error(error)
+            
+            # Show before/after comparison
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📝 Original Code")
+                st.code(fix_result["original"], language="python")
+            
+            with col2:
+                st.subheader("✨ Fixed Code")
+                st.code(fix_result["fixed"], language="python")
+            
+            # Copy and download functionality
+            st.subheader("📋 Copy Fixed Code")
+            copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
+            
+            st.subheader("💾 Download Fixed Code")
+            download_button_enhanced(fix_result["fixed"], "fixed_code.py", "Download Fixed Code", "text/x-python")
+
+# Tab 4: AI Detection (removed URL input)
+with tabs[3]:
+    st.header("🤖 Neural AI Detection")
+    st.write("*Advanced analysis to detect AI-generated code patterns*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        ai_code_text = st.text_area(
+            "Code to Analyze",
+            height=250,
+            placeholder="Paste code to check for AI generation patterns...",
+            key="ai_code_input"
+        )
+    
+    with col2:
+        ai_code_file = st.file_uploader("Upload Code File", type=["py"], key="ai_code_file")
+        
+        st.info("🔍 **Detection Features:**\n"
+                "• Comment density analysis\n"
+                "• Generic naming patterns\n"
+                "• Code repetition metrics\n"
+                "• Formatting perfectness\n"
+                "• Statistical anomalies")
+    
+    if st.button("🔍 Detect AI Patterns", type="primary", key="ai_detect_btn"):
+        ai_content = ""
+        
+        if ai_code_file:
+            ai_content = ai_code_file.read().decode("utf-8", errors="ignore")
+        elif ai_code_text.strip():
+            ai_content = ai_code_text
+        
+        if not ai_content:
+            st.warning("Please provide code via input or file.")
+        else:
+            with st.spinner("Running AI detection..."):
+                ai_result = detect_ai_generated_code(ai_content)
+            
+            # Show results
+            st.subheader("🎯 Detection Results")
+            
+            # Main result with colored background
+            score = ai_result["score"]
+            if score >= 70:
+                st.error(f"**{ai_result['label']}** (Score: {score}%)")
+            elif score >= 45:
+                st.warning(f"**{ai_result['label']}** (Score: {score}%)")
+            else:
+                st.success(f"**{ai_result['label']}** (Score: {score}%)")
+            
+            # Show reasons
+            if ai_result["reasons"]:
+                st.subheader("📊 Analysis Details")
+                for reason in ai_result["reasons"]:
+                    st.write(f"• {reason}")
+            
+            # Technical metrics
+            with st.expander("🔬 Technical Metrics", expanded=False):
+                features = ai_result["features"]
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Comment Density", f"{features.get('comment_density', 0):.3f}")
+                    st.metric("Generic Names", f"{features.get('generic_name_density', 0):.3f}")
+                
+                with col2:
+                    st.metric("Repeated Lines", f"{features.get('repeated_line_ratio', 0):.3f}")
+                    st.metric("Perfect Format", f"{features.get('perfect_formatting', 0):.1f}")
+            
+            # Copy functionality
+            ai_report = f"""AI DETECTION REPORT
+===================
+
+Result: {ai_result['label']} (Score: {ai_result['score']}%)
+
+Reasons:
+{chr(10).join(f"- {reason}" for reason in ai_result['reasons']) if ai_result['reasons'] else "No specific indicators found"}
+
+Technical Metrics:
+- Comment Density: {ai_result['features'].get('comment_density', 0):.3f}
+- Generic Name Density: {ai_result['features'].get('generic_name_density', 0):.3f}  
+- Repeated Line Ratio: {ai_result['features'].get('repeated_line_ratio', 0):.3f}
+- Perfect Formatting: {ai_result['features'].get('perfect_formatting', 0):.1f}"""
+
+            st.subheader("📋 Copy Detection Report")
+            copy_button(ai_report, "Copy AI Report", key="ai_detection_report")
+            
+            st.subheader("💾 Download Report")
+            download_button_enhanced(ai_report, "ai_detection_report.txt", "Download AI Report")
+
+# Tab 5: URL Extractor
+with tabs[4]:
+    st.header("🌐 Web Content Extractor")
+    st.write("*Extract and analyze content from web pages*")
+    
+    url_input = st.text_input("Enter URL", placeholder="https://example.com", key="url_extractor_input")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        extract_mode = st.selectbox("Extraction Mode", ["Text Only", "Text + Analysis"], key="extract_mode")
+    with col2:
+        max_chars = st.slider("Max Characters", 1000, 50000, 10000, key="max_chars")
+    
+    if st.button("🌐 Extract Content", type="primary", key="extract_btn"):
+        if not url_input.strip():
+            st.warning("Please enter a URL.")
+        else:
+            with st.spinner("Fetching content..."):
+                content = fetch_from_url(url_input.strip())
+            
+            if content.startswith("❌"):
+                st.error(content)
+            else:
+                # Truncate if too long
+                if len(content) > max_chars:
+                    content = content[:max_chars] + "\n\n[Content truncated...]"
+                
+                st.success("Content extracted successfully!")
+                
+                # Show content
+                st.subheader("📄 Extracted Content")
+                st.text_area("Content", content, height=300, key="extracted_content_display")
+                
+                # Analysis if requested
+                if extract_mode == "Text + Analysis":
+                    with st.spinner("Analyzing content..."):
+                        summary = summarize_text_advanced(content, max_sentences=5)
+                    
+                    st.subheader("📊 Content Analysis")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Characters", f"{len(content):,}")
+                    with col2:
+                        st.metric("Words", f"{len(content.split()):,}")
+                    with col3:
+                        st.metric("Lines", f"{len(content.splitlines()):,}")
+                    with col4:
+                        st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
+                    
+                    st.subheader("📋 Auto Summary")
+                    st.write(summary)
+                    
+                    # Copy summary
+                    copy_button(summary, "Copy Summary", key="url_summary")
+                
+                # Copy full content
+                st.subheader("📋 Copy Content")
+                copy_button(content, "Copy Full Content", key="url_content")
+                
+                # Download content
+                st.subheader("💾 Download Content")
+                download_button_enhanced(content, "extracted_content.txt", "Download Content")
+
+# Footer
+st.markdown("---")
+st.markdown(
+    '<div style="text-align: center; color: rgba(0, 249, 255, 0.6); margin: 2rem 0;">'
+    '🌌 TECHNOVA AI NEXUS v2.1 | Powered by Advanced Neural Networks 🚀'
+    '</div>', 
+    unsafe_allow_html=True
+)
+            match = re.search(print_pattern, line)
+            if match:
+                print_content = match.group(1).strip()
+                if not print_content.startswith('('):
+                    new_line = re.sub(print_pattern, f'print({print_content})', line)
+                    if new_line != line:
+                        line = new_line
+                        fixes_applied.append(f"Fixed print statement syntax at line {i+1}")
+                        made_changes = True
+            
+            # 4. Fix unclosed parentheses and brackets
+            for char_pair in [('(', ')'), ('[', ']'), ('{', '}')]:
+                open_char, close_char = char_pair
+                open_count = line.count(open_char)
+                close_count = line.count(close_char)
+                
+                if open_count > close_count:
+                    diff = open_count - close_count
+                    line = line.rstrip() + (close_char * diff)
+                    fixes_applied.append(f"Added {diff} missing '{close_char}' at line {i+1}")
+                    made_changes = True
+            
+            # 5. Fix unclosed quotes (improved logic)
+            # Count quotes not preceded by backslash
+            single_quotes = len([m for m in re.finditer(r"(?<!\\)'", line)])
+            double_quotes = len([m for m in re.finditer(r'(?<!\\)"', line)])
+            
+            if single_quotes % 2 != 0 and double_quotes % 2 == 0:
+                line = line.rstrip() + "'"
+                fixes_applied.append(f"Added missing single quote at line {i+1}")
+                made_changes = True
+            elif double_quotes % 2 != 0 and single_quotes % 2 == 0:
+                line = line.rstrip() + '"'
+                fixes_applied.append(f"Added missing double quote at line {i+1}")
+                made_changes = True
+            
+            # 6. Fix common comparison mistakes
+            # = instead of ==
+            if re.search(r'\bif\b.*[^!=<>]\s*=\s*[^=]', line):
+                line = re.sub(r'(\bif\b.*?)([^!=<>])\s*=\s*([^=])', r'\1\2 == \3', line)
+                fixes_applied.append(f"Fixed assignment in if statement (= -> ==) at line {i+1}")
+                made_changes = True
+            
+            # 7. Fix missing import statements for common functions
+            if re.search(r'\b(sqrt|sin|cos|tan|log|ceil|floor)\b', line) and i < 3:
+                if not any('import math' in l or 'from math import' in l for l in lines[:i+5]):
+                    # Add import at the beginning
+                    if i == 0:
+                        new_lines.insert(0, "import math")
+                        fixes_applied.append("Added missing 'import math' statement")
+                        made_changes = True
+            
+            # 8. Fix incorrect variable assignments
+            # Handle cases like: x + 1 (missing assignment)
+            if (re.match(r'^\s*[a-zA-Z_]\w*\s*[+\-*/]\s*\w+\s*
+
+def analyze_python_enhanced(code: str):
+    """Comprehensive Python code analysis with enhanced metrics"""
+    report = {
+        "basic_stats": {},
+        "functions": [],
+        "classes": [],
+        "imports": [],
+        "variables": [],
+        "purpose_summary": "",
+        "errors": [],
+        "warnings": [],
+        "fixes": [],
+        "complexity_metrics": {},
+        "code_quality": {},
+        "detailed_counts": {},
+        "builtin_functions_used": []
+    }
+    
+    if not code or not code.strip():
+        return report
+    
+    lines = code.splitlines()
+    code_lines = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+    comment_lines = [line for line in lines if line.strip().startswith("#")]
+    blank_lines = [line for line in lines if not line.strip()]
+    
+    # Basic statistics
+    report["basic_stats"] = {
+        "total_lines": len(lines),
+        "code_lines": len(code_lines),
+        "comment_lines": len(comment_lines),
+        "blank_lines": len(blank_lines),
+        "characters": len(code),
+        "words": len(code.split())
+    }
+    
+    # Initialize counters
+    function_count = 0
+    class_count = 0
+    import_count = 0
+    print_count = 0
+    if_count = 0
+    for_count = 0
+    while_count = 0
+    try_count = 0
+    with_count = 0
+    def_count = 0
+    lambda_count = 0
+    list_comp_count = 0
+    dict_comp_count = 0
+    
+    # Pattern-based counting
+    for line in code_lines:
+        stripped_line = line.strip()
+        
+        # Count various constructs
+        if stripped_line.startswith("def "):
+            def_count += 1
+        if stripped_line.startswith("class "):
+            class_count += 1
+        if stripped_line.startswith(("import ", "from ")):
+            import_count += 1
+        
+        # Count control structures and statements
+        print_count += len(re.findall(r'\bprint\s*\(', line))
+        if_count += len(re.findall(r'\bif\b', line))
+        for_count += len(re.findall(r'\bfor\b', line))
+        while_count += len(re.findall(r'\bwhile\b', line))
+        try_count += len(re.findall(r'\btry\b', line))
+        with_count += len(re.findall(r'\bwith\b', line))
+        lambda_count += len(re.findall(r'\blambda\b', line))
+        list_comp_count += len(re.findall(r'\[.*for.*in.*\]', line))
+        dict_comp_count += len(re.findall(r'\{.*for.*in.*\}', line))
+    
+    report["detailed_counts"] = {
+        "functions": def_count,
+        "classes": class_count,
+        "imports": import_count,
+        "print_statements": print_count,
+        "if_statements": if_count,
+        "for_loops": for_count,
+        "while_loops": while_count,
+        "try_blocks": try_count,
+        "with_statements": with_count,
+        "lambda_expressions": lambda_count,
+        "list_comprehensions": list_comp_count,
+        "dict_comprehensions": dict_comp_count
+    }
+    
+    # Calculate complexity metrics
+    total_constructs = sum([if_count, for_count, while_count, try_count, def_count])
+    complexity_score = total_constructs / max(1, len(code_lines)) * 100
+    
+    report["complexity_metrics"] = {
+        "cyclomatic_complexity_estimate": total_constructs + 1,
+        "complexity_per_line": round(complexity_score, 2),
+        "nesting_level_estimate": max(0, len(re.findall(r'    ', code)) // len(code_lines) * 10) if code_lines else 0
+    }
+    
+    # Code quality metrics
+    comment_ratio = len(comment_lines) / max(1, len(lines)) * 100
+    avg_line_length = sum(len(line) for line in code_lines) / max(1, len(code_lines))
+    
+    report["code_quality"] = {
+        "comment_ratio": round(comment_ratio, 2),
+        "avg_line_length": round(avg_line_length, 2),
+        "code_to_comment_ratio": round(len(code_lines) / max(1, len(comment_lines)), 2)
+    }
+    
+    # Basic parsing for simple analysis
+    for line in code_lines:
+        stripped = line.strip()
+        if stripped.startswith("def "):
+            match = re.match(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)", stripped)
+            if match:
+                report["functions"].append(match.group(1))
+        elif stripped.startswith("class "):
+            match = re.match(r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)", stripped)
+            if match:
+                report["classes"].append(match.group(1))
+        elif stripped.startswith(("import ", "from ")):
+            report["imports"].append(stripped)
+    
+    # Generate purpose summary
+    report["purpose_summary"] = summarize_text_advanced(code, max_sentences=3)
+    
+    # AST analysis for deeper insights
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
+        report["fixes"].append("Check syntax: indentation, colons, parentheses, quotes.")
+        return report
+    
+    # Enhanced AST analysis
+    imported_names = set()
+    used_names = set()
+    assigned_names = set()
+    builtin_functions_used = set()
+    
+    builtin_funcs = {
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate',
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input',
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct',
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round',
+        'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+    }
+    
+    class EnhancedCodeAnalyzer(ast.NodeVisitor):
+        def visit_Import(self, node):
+            for alias in node.names:
+                imported_names.add(alias.asname or alias.name.split(".")[0])
+            self.generic_visit(node)
+        
+        def visit_ImportFrom(self, node):
+            for alias in node.names:
+                imported_names.add(alias.asname or alias.name)
+            self.generic_visit(node)
+        
+        def visit_FunctionDef(self, node):
+            assigned_names.add(node.name)
+            # Check for mutable default arguments
+            for default in node.args.defaults:
+                if isinstance(default, (ast.List, ast.Dict, ast.Set)):
+                    report["warnings"].append(f"Mutable default argument in '{node.name}'")
+                    report["fixes"].append(f"Use None as default in '{node.name}' and create objects inside function")
+            
+            # Check for long functions
+            func_lines = len([n for n in ast.walk(node) if hasattr(n, 'lineno')])
+            if func_lines > 50:
+                report["warnings"].append(f"Function '{node.name}' is very long ({func_lines} lines)")
+                report["fixes"].append(f"Consider breaking down '{node.name}' into smaller functions")
+            
+            self.generic_visit(node)
+        
+        def visit_ClassDef(self, node):
+            assigned_names.add(node.name)
+            self.generic_visit(node)
+        
+        def visit_Name(self, node):
+            if isinstance(node.ctx, ast.Load):
+                used_names.add(node.id)
+                if node.id in builtin_funcs:
+                    builtin_functions_used.add(node.id)
+            elif isinstance(node.ctx, ast.Store):
+                assigned_names.add(node.id)
+                report["variables"].append(node.id)
+            self.generic_visit(node)
+        
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Name):
+                if node.func.id in {"eval", "exec"}:
+                    report["warnings"].append(f"Dangerous {node.func.id} usage detected")
+                    report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
+                elif node.func.id == "print" and len(node.args) == 0:
+                    report["warnings"].append("Empty print() statement found")
+                    report["fixes"].append("Remove empty print() or add meaningful content")
+            self.generic_visit(node)
+    
+    EnhancedCodeAnalyzer().visit(tree)
+    
+    # Add builtin functions used to report
+    report["builtin_functions_used"] = sorted(list(builtin_functions_used))
+    
+    # Check for unused imports
+    unused_imports = []
+    for name in sorted(imported_names):
+        if name not in used_names and name not in {"__future__"}:
+            unused_imports.append(name)
+            report["warnings"].append(f"Possibly unused import: '{name}'")
+            report["fixes"].append(f"Remove unused import '{name}' if not needed")
+    
+    # Check for builtin shadowing
+    builtins_list = [
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate',
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input',
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct',
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round',
+        'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+    ]
+    
+    shadowed_builtins = []
+    for name in assigned_names:
+        if name in builtins_list:
+            shadowed_builtins.append(name)
+            report["warnings"].append(f"Variable '{name}' shadows builtin")
+            report["fixes"].append(f"Rename '{name}' to avoid shadowing builtins")
+    
+    # Code quality analysis
+    if report["code_quality"]["comment_ratio"] < 5:
+        report["warnings"].append("Low comment density - consider adding more documentation")
+        report["fixes"].append("Add docstrings to functions and classes, and inline comments for complex logic")
+    
+    if report["code_quality"]["avg_line_length"] > 100:
+        report["warnings"].append("Some lines are very long - consider breaking them up")
+        report["fixes"].append("Break long lines at logical points (after commas, operators, etc.)")
+    
+    # Add general recommendations
+    if not report["errors"]:
+        if not report["warnings"]:
+            report["fixes"].append("🎉 Code looks excellent! Consider adding unit tests and type hints.")
+        else:
+            report["fixes"].append("Review warnings above and apply suggested fixes for better code quality.")
+    
+    # Remove duplicate variables
+    report["variables"] = sorted(list(set(report["variables"])))
+    
+    return report
+
+def detect_ai_generated_code(code: str) -> dict:
+    """Detect if code might be AI-generated based on patterns"""
+    if not code or not code.strip():
+        return {"score": 0, "label": "❓ No content", "reasons": [], "features": {}}
+    
+    lines = code.splitlines()
+    code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+    comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
+    
+    features = {}
+    total_lines = max(1, len(lines))
+    
+    # Comment density
+    features["comment_density"] = len(comment_lines) / total_lines
+    
+    # Repeated lines
+    normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+    counts = Counter(normalized)
+    repeated = sum(c for c in counts.values() if c > 1)
+    features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
+    
+    # Generic variable names
+    generic_names = {"data", "result", "temp", "value", "item", "input", "output", "res", "var", "obj"}
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
+    generic_count = sum(1 for t in tokens if t in generic_names)
+    features["generic_name_density"] = generic_count / max(1, len(tokens))
+    
+    # Perfect formatting (suspicious)
+    perfect_indent = all(len(line) - len(line.lstrip()) % 4 == 0 for line in code_lines if line.strip())
+    features["perfect_formatting"] = 1.0 if perfect_indent and len(code_lines) > 10 else 0.0
+    
+    # Calculate score
+    score = (
+        25 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15) +
+        35 * features["repeated_line_ratio"] +
+        20 * min(1.0, features["generic_name_density"] * 20) +
+        20 * features["perfect_formatting"]
+    )
+    
+    score = max(0.0, min(100.0, score))
+    
+    # Determine label
+    if score >= 70:
+        label = "🚨 Likely AI-generated"
+    elif score >= 45:
+        label = "🤔 Unclear/Mixed"
+    else:
+        label = "✅ Likely human-written"
+    
+    # Generate reasons
+    reasons = []
+    if features["repeated_line_ratio"] > 0.1:
+        reasons.append("High repetition of similar code patterns")
+    if features["comment_density"] < 0.02 or features["comment_density"] > 0.4:
+        reasons.append("Unusual comment density")
+    if features["generic_name_density"] > 0.03:
+        reasons.append("Frequent generic variable names")
+    if features["perfect_formatting"] == 1.0:
+        reasons.append("Suspiciously perfect code formatting")
+    
+    return {
+        "score": round(score, 1),
+        "label": label,
+        "reasons": reasons,
+        "features": features
+    }
+
+def fetch_from_url(url: str) -> str:
+    """Fetch and extract text content from URL"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        resp = requests.get(url, timeout=10, headers=headers)
+        resp.raise_for_status()
+        
+        content_type = resp.headers.get("Content-Type", "")
+        if "text/html" in content_type:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Remove unwanted elements
+            for element in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                element.extract()
+            return soup.get_text(separator="\n", strip=True)
+        else:
+            return resp.text
+        
+    except requests.exceptions.RequestException as e:
+        return f"❌ Error fetching URL: {str(e)}"
+    except Exception as e:
+        return f"❌ Error processing content: {str(e)}"
+
+# Create tabs
+tabs = st.tabs([
+    "📄 Document Processor",
+    "🧠 Code Analyzer", 
+    "🔧 Code Corrector",
+    "🤖 AI Detection",
+    "🌐 URL Extractor"
+])
+
+# Tab 1: Document Processor
+with tabs[0]:
+    st.header("📄 Neural Document Processor")
+    st.write("*Advanced text analysis and summarization*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        doc_text = st.text_area(
+            "Input Text",
+            height=200,
+            placeholder="Paste your document content here...",
+            key="doc_text_input"
+        )
+    
+    with col2:
+        doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"], key="doc_file_upload")
+        doc_url = st.text_input("Document URL", placeholder="https://...", key="doc_url_input")
+        doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
+        doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
+    
+    if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
+        content = ""
+        
+        # Get content from various sources
+        if doc_file:
+            if doc_file.name.lower().endswith(".pdf"):
+                if not PDF_AVAILABLE:
+                    st.error("PDF processing requires PyPDF2. Install with: pip install PyPDF2")
+                else:
+                    try:
+                        reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
+                        pages_text = []
+                        for page in reader.pages:
+                            pages_text.append(page.extract_text() or "")
+                        content = "\n".join(pages_text)
+                    except Exception as e:
+                        st.error(f"PDF error: {e}")
+            else:
+                content = doc_file.read().decode("utf-8", errors="ignore")
+        elif doc_url.strip():
+            with st.spinner("Fetching content..."):
+                content = fetch_from_url(doc_url.strip())
+        elif doc_text.strip():
+            content = doc_text
+        
+        if not content:
+            st.warning("Please provide content via text, file, or URL.")
+        elif content.startswith("❌"):
+            st.error(content)
+        else:
+            with st.spinner("Processing..."):
+                summary = summarize_text_advanced(content, doc_length, doc_bullets)
+            
+            st.success("Analysis Complete!")
+            
+            # Show summary FIRST (most important)
+            st.subheader("📋 Generated Summary")
+            if doc_bullets:
+                st.markdown(summary)
+            else:
+                st.write(summary)
+            
+            # Copy functionality for summary
+            st.subheader("📋 Copy Summary")
+            copy_button(summary, "Copy Summary", key="doc_summary")
+            
+            # Download button
+            st.subheader("💾 Download Summary")
+            download_button_enhanced(summary, "summary.txt", "Download Summary")
+            
+            # Then show document metrics
+            st.subheader("📊 Document Statistics")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Characters", f"{len(content):,}")
+            with col2:
+                st.metric("Words", f"{len(content.split()):,}")
+            with col3:
+                st.metric("Lines", f"{len(content.splitlines()):,}")
+            with col4:
+                st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
+
+# Tab 2: Enhanced Code Analyzer (removed URL input)
+with tabs[1]:
+    st.header("🧠 Quantum Code Analyzer")
+    st.write("*Deep code analysis with comprehensive metrics and optimization recommendations*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        code_text = st.text_area(
+            "Python Code",
+            height=250,
+            placeholder="Paste your Python code here...",
+            key="code_text_input"
+        )
+    
+    with col2:
+        code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
+    
+    if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
+        code_content = ""
+        
+        if code_file:
+            code_content = code_file.read().decode("utf-8", errors="ignore")
+        elif code_text.strip():
+            code_content = code_text
+        
+        if not code_content:
+            st.warning("Please provide code via input or file.")
+        else:
+            with st.expander("Code Preview", expanded=False):
+                st.code(code_content, language="python")
+            
+            with st.spinner("Analyzing code..."):
+                report = analyze_python_enhanced(code_content)
+            
+            st.success("🎉 Analysis Complete!")
+            
+            # PRIORITY SECTION 1: ERRORS (Most Important)
+            st.header("❌ Errors")
+            if report["errors"]:
+                for error in report["errors"]:
+                    st.error(error)
+            else:
+                st.success("✅ No syntax errors found!")
+            
+            # PRIORITY SECTION 2: WARNINGS
+            st.header("⚠️ Warnings")
+            if report["warnings"]:
+                for warning in report["warnings"]:
+                    st.warning(warning)
+            else:
+                st.success("✅ No warnings!")
+            
+            # PRIORITY SECTION 3: SUGGESTIONS/RECOMMENDATIONS
+            st.header("💡 Suggestions & Recommendations")
+            for fix in report["fixes"]:
+                st.info(fix)
+            
+            # PRIORITY SECTION 4: CODE SUMMARY
+            st.header("📋 Code Summary")
+            st.write(report["purpose_summary"])
+            
+            # Copy functionality for main analysis
+            st.header("📋 Copy Analysis Report")
+            formatted_report = f"""CODE ANALYSIS REPORT
+==================
+
+ERRORS ({len(report['errors'])} found):
+{chr(10).join(f"- {error}" for error in report['errors']) if report['errors'] else "✅ No errors"}
+
+WARNINGS ({len(report['warnings'])} found):
+{chr(10).join(f"- {warning}" for warning in report['warnings']) if report['warnings'] else "✅ No warnings"}
+
+RECOMMENDATIONS:
+{chr(10).join(f"- {fix}" for fix in report['fixes'])}
+
+CODE SUMMARY:
+{report['purpose_summary']}
+
+FUNCTIONS FOUND ({len(report['functions'])}):
+{', '.join(report['functions']) if report['functions'] else "None"}
+
+CLASSES FOUND ({len(report['classes'])}):
+{', '.join(report['classes']) if report['classes'] else "None"}
+
+DETAILED STATISTICS:
+- Total Lines: {report['basic_stats'].get('total_lines', 0)}
+- Code Lines: {report['basic_stats'].get('code_lines', 0)}
+- Comment Lines: {report['basic_stats'].get('comment_lines', 0)}
+- Functions: {report['detailed_counts'].get('functions', 0)}
+- Classes: {report['detailed_counts'].get('classes', 0)}
+- Imports: {report['detailed_counts'].get('imports', 0)}
+- Print Statements: {report['detailed_counts'].get('print_statements', 0)}
+- If Statements: {report['detailed_counts'].get('if_statements', 0)}
+- For Loops: {report['detailed_counts'].get('for_loops', 0)}
+- While Loops: {report['detailed_counts'].get('while_loops', 0)}"""
+
+            copy_button(formatted_report, "Copy Full Report", key="code_report")
+            
+            # Download button for report
+            st.subheader("💾 Download Report")
+            download_button_enhanced(formatted_report, "code_analysis_report.txt", "Download Report")
+            
+            # NOW SHOW DETAILED METRICS (Lower Priority)
+            st.header("📊 Detailed Code Metrics")
+            
+            # Functions and Classes Found
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if report["functions"]:
+                    st.subheader("🔧 Functions Found")
+                    for func in report["functions"][:10]:  # Show first 10
+                        st.write(f"• `{func}()`")
+                    if len(report["functions"]) > 10:
+                        st.write(f"... and {len(report['functions']) - 10} more")
+                
+                # SAFE ACCESS TO builtin_functions_used
+                builtin_functions = report.get("builtin_functions_used", [])
+                if builtin_functions:
+                    st.subheader("🐍 Built-in Functions Used")
+                    builtin_display = ", ".join(f"`{func}()`" for func in builtin_functions[:15])
+                    st.write(builtin_display)
+                    if len(builtin_functions) > 15:
+                        st.write(f"... and {len(builtin_functions) - 15} more")
+            
+            with col2:
+                if report["classes"]:
+                    st.subheader("🏗️ Classes Found")
+                    for cls in report["classes"]:
+                        st.write(f"• `{cls}`")
+                
+                if report["variables"]:
+                    st.subheader("📝 Variables")
+                    variables_display = ", ".join(f"`{var}`" for var in report["variables"][:20])
+                    st.write(variables_display)
+                    if len(report["variables"]) > 20:
+                        st.write(f"... and {len(report['variables']) - 20} more variables")
+            
+            # Basic Statistics Section
+            st.subheader("📈 Line Statistics")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Lines", report["basic_stats"].get("total_lines", 0))
+                st.metric("Functions", report["detailed_counts"].get("functions", 0))
+            with col2:
+                st.metric("Code Lines", report["basic_stats"].get("code_lines", 0))
+                st.metric("Classes", report["detailed_counts"].get("classes", 0))
+            with col3:
+                st.metric("Comments", report["basic_stats"].get("comment_lines", 0))
+                st.metric("Imports", report["detailed_counts"].get("imports", 0))
+            with col4:
+                st.metric("Characters", f"{report['basic_stats'].get('characters', 0):,}")
+                st.metric("Print Statements", report["detailed_counts"].get("print_statements", 0))
+            
+            # Detailed Counts Section
+            st.subheader("🔧 Code Constructs")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("If Statements", report["detailed_counts"].get("if_statements", 0))
+                st.metric("For Loops", report["detailed_counts"].get("for_loops", 0))
+            with col2:
+                st.metric("While Loops", report["detailed_counts"].get("while_loops", 0))
+                st.metric("Try Blocks", report["detailed_counts"].get("try_blocks", 0))
+            with col3:
+                st.metric("With Statements", report["detailed_counts"].get("with_statements", 0))
+                st.metric("Lambda Expressions", report["detailed_counts"].get("lambda_expressions", 0))
+            with col4:
+                st.metric("List Comprehensions", report["detailed_counts"].get("list_comprehensions", 0))
+                st.metric("Dict Comprehensions", report["detailed_counts"].get("dict_comprehensions", 0))
+            
+            # Code Quality Metrics
+            st.subheader("📊 Quality Metrics")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                comment_ratio = report["code_quality"].get("comment_ratio", 0)
+                st.metric("Comment Ratio", f"{comment_ratio:.1f}%")
+            
+            with col2:
+                avg_line_length = report["code_quality"].get("avg_line_length", 0)
+                st.metric("Avg Line Length", f"{avg_line_length:.1f} chars")
+            
+            with col3:
+                complexity = report["complexity_metrics"].get("cyclomatic_complexity_estimate", 0)
+                st.metric("Complexity Score", complexity)
+            
+            # Imports and Variables Details
+            with st.expander("📦 Imports & Variables Details", expanded=False):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if report["imports"]:
+                        st.subheader("📥 Imports")
+                        for imp in report["imports"]:
+                            st.code(imp, language="python")
+                    else:
+                        st.write("No imports found")
+                
+                with col2:
+                    if report["variables"]:
+                        st.subheader("📝 All Variables")
+                        st.write(", ".join(f"`{var}`" for var in report["variables"]))
+
+# Tab 3: NEW Code Corrector
+with tabs[2]:
+    st.header("🔧 AI Code Corrector")
+    st.write("*Automatically fix common Python syntax errors and issues*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        wrong_code = st.text_area(
+            "Problematic Python Code",
+            height=250,
+            placeholder="Paste your buggy or incorrect Python code here...",
+            key="wrong_code_input"
+        )
+    
+    with col2:
+        wrong_code_file = st.file_uploader("Upload Buggy Python File", type=["py"], key="wrong_code_file")
+        
+        st.info("🔧 **Auto-Fix Features:**\n"
+                "• Missing colons\n"
+                "• Indentation issues\n" 
+                "• Print statement syntax\n"
+                "• Unclosed quotes\n"
+                "• Common syntax errors")
+    
+    if st.button("🛠️ Fix Code", type="primary", key="fix_code_btn"):
+        code_to_fix = ""
+        
+        if wrong_code_file:
+            code_to_fix = wrong_code_file.read().decode("utf-8", errors="ignore")
+        elif wrong_code.strip():
+            code_to_fix = wrong_code
+        
+        if not code_to_fix:
+            st.warning("Please provide code to fix via input or file.")
+        else:
+            with st.spinner("🔧 Applying fixes..."):
+                fix_result = fix_python_code(code_to_fix)
+            
+            if fix_result["success"]:
+                st.success("✅ Code successfully fixed!")
+            else:
+                st.warning("⚠️ Partial fixes applied - some errors may remain")
+            
+            # Show fixes applied
+            st.subheader("🛠️ Fixes Applied")
+            for fix in fix_result["fixes_applied"]:
+                st.info(fix)
+            
+            # Show remaining errors if any
+            if fix_result["remaining_errors"]:
+                st.subheader("❌ Remaining Issues")
+                for error in fix_result["remaining_errors"]:
+                    st.error(error)
+            
+            # Show before/after comparison
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📝 Original Code")
+                st.code(fix_result["original"], language="python")
+            
+            with col2:
+                st.subheader("✨ Fixed Code")
+                st.code(fix_result["fixed"], language="python")
+            
+            # Copy and download functionality
+            st.subheader("📋 Copy Fixed Code")
+            copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
+            
+            st.subheader("💾 Download Fixed Code")
+            download_button_enhanced(fix_result["fixed"], "fixed_code.py", "Download Fixed Code", "text/x-python")
+
+# Tab 4: AI Detection (removed URL input)
+with tabs[3]:
+    st.header("🤖 Neural AI Detection")
+    st.write("*Advanced analysis to detect AI-generated code patterns*")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        ai_code_text = st.text_area(
+            "Code to Analyze",
+            height=250,
+            placeholder="Paste code to check for AI generation patterns...",
+            key="ai_code_input"
+        )
+    
+    with col2:
+        ai_code_file = st.file_uploader("Upload Code File", type=["py"], key="ai_code_file")
+        
+        st.info("🔍 **Detection Features:**\n"
+                "• Comment density analysis\n"
+                "• Generic naming patterns\n"
+                "• Code repetition metrics\n"
+                "• Formatting perfectness\n"
+                "• Statistical anomalies")
+    
+    if st.button("🔍 Detect AI Patterns", type="primary", key="ai_detect_btn"):
+        ai_content = ""
+        
+        if ai_code_file:
+            ai_content = ai_code_file.read().decode("utf-8", errors="ignore")
+        elif ai_code_text.strip():
+            ai_content = ai_code_text
+        
+        if not ai_content:
+            st.warning("Please provide code via input or file.")
+        else:
+            with st.spinner("Running AI detection..."):
+                ai_result = detect_ai_generated_code(ai_content)
+            
+            # Show results
+            st.subheader("🎯 Detection Results")
+            
+            # Main result with colored background
+            score = ai_result["score"]
+            if score >= 70:
+                st.error(f"**{ai_result['label']}** (Score: {score}%)")
+            elif score >= 45:
+                st.warning(f"**{ai_result['label']}** (Score: {score}%)")
+            else:
+                st.success(f"**{ai_result['label']}** (Score: {score}%)")
+            
+            # Show reasons
+            if ai_result["reasons"]:
+                st.subheader("📊 Analysis Details")
+                for reason in ai_result["reasons"]:
+                    st.write(f"• {reason}")
+            
+            # Technical metrics
+            with st.expander("🔬 Technical Metrics", expanded=False):
+                features = ai_result["features"]
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Comment Density", f"{features.get('comment_density', 0):.3f}")
+                    st.metric("Generic Names", f"{features.get('generic_name_density', 0):.3f}")
+                
+                with col2:
+                    st.metric("Repeated Lines", f"{features.get('repeated_line_ratio', 0):.3f}")
+                    st.metric("Perfect Format", f"{features.get('perfect_formatting', 0):.1f}")
+            
+            # Copy functionality
+            ai_report = f"""AI DETECTION REPORT
+===================
+
+Result: {ai_result['label']} (Score: {ai_result['score']}%)
+
+Reasons:
+{chr(10).join(f"- {reason}" for reason in ai_result['reasons']) if ai_result['reasons'] else "No specific indicators found"}
+
+Technical Metrics:
+- Comment Density: {ai_result['features'].get('comment_density', 0):.3f}
+- Generic Name Density: {ai_result['features'].get('generic_name_density', 0):.3f}  
+- Repeated Line Ratio: {ai_result['features'].get('repeated_line_ratio', 0):.3f}
+- Perfect Formatting: {ai_result['features'].get('perfect_formatting', 0):.1f}"""
+
+            st.subheader("📋 Copy Detection Report")
+            copy_button(ai_report, "Copy AI Report", key="ai_detection_report")
+            
+            st.subheader("💾 Download Report")
+            download_button_enhanced(ai_report, "ai_detection_report.txt", "Download AI Report")
+
+# Tab 5: URL Extractor
+with tabs[4]:
+    st.header("🌐 Web Content Extractor")
+    st.write("*Extract and analyze content from web pages*")
+    
+    url_input = st.text_input("Enter URL", placeholder="https://example.com", key="url_extractor_input")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        extract_mode = st.selectbox("Extraction Mode", ["Text Only", "Text + Analysis"], key="extract_mode")
+    with col2:
+        max_chars = st.slider("Max Characters", 1000, 50000, 10000, key="max_chars")
+    
+    if st.button("🌐 Extract Content", type="primary", key="extract_btn"):
+        if not url_input.strip():
+            st.warning("Please enter a URL.")
+        else:
+            with st.spinner("Fetching content..."):
+                content = fetch_from_url(url_input.strip())
+            
+            if content.startswith("❌"):
+                st.error(content)
+            else:
+                # Truncate if too long
+                if len(content) > max_chars:
+                    content = content[:max_chars] + "\n\n[Content truncated...]"
+                
+                st.success("Content extracted successfully!")
+                
+                # Show content
+                st.subheader("📄 Extracted Content")
+                st.text_area("Content", content, height=300, key="extracted_content_display")
+                
+                # Analysis if requested
+                if extract_mode == "Text + Analysis":
+                    with st.spinner("Analyzing content..."):
+                        summary = summarize_text_advanced(content, max_sentences=5)
+                    
+                    st.subheader("📊 Content Analysis")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Characters", f"{len(content):,}")
+                    with col2:
+                        st.metric("Words", f"{len(content.split()):,}")
+                    with col3:
+                        st.metric("Lines", f"{len(content.splitlines()):,}")
+                    with col4:
+                        st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
+                    
+                    st.subheader("📋 Auto Summary")
+                    st.write(summary)
+                    
+                    # Copy summary
+                    copy_button(summary, "Copy Summary", key="url_summary")
+                
+                # Copy full content
+                st.subheader("📋 Copy Content")
+                copy_button(content, "Copy Full Content", key="url_content")
+                
+                # Download content
+                st.subheader("💾 Download Content")
+                download_button_enhanced(content, "extracted_content.txt", "Download Content")
+
+# Footer
+st.markdown("---")
+st.markdown(
+    '<div style="text-align: center; color: rgba(0, 249, 255, 0.6); margin: 2rem 0;">'
+    '🌌 TECHNOVA AI NEXUS v2.1 | Powered by Advanced Neural Networks 🚀'
+    '</div>', 
+    unsafe_allow_html=True
+), line.strip()) and 
+                not any(op in line for op in ['=', '+=', '-=', '*=', '/='])):
+                var_name = re.match(r'^\s*([a-zA-Z_]\w*)', line.strip()).group(1)
+                line = re.sub(r'(\s*)([a-zA-Z_]\w*\s*[+\-*/]\s*\w+)', r'\1\2  # Possible missing assignment?', line)
+                fixes_applied.append(f"Flagged possible missing assignment at line {i+1}")
+                made_changes = True
+            
+            # 9. Fix function definition issues
+            if stripped.startswith('def ') and '(' not in stripped:
+                # Add empty parentheses: def func -> def func()
+                func_match = re.match(r'(\s*def\s+\w+)', line)
+                if func_match:
+                    line = line.replace(func_match.group(1), func_match.group(1) + '()')
+                    fixes_applied.append(f"Added parentheses to function definition at line {i+1}")
+                    made_changes = True
+            
+            # 10. Fix range() usage
+            # for i in 10: -> for i in range(10):
+            range_pattern = r'(\bfor\s+\w+\s+in\s+)(\d+)(\s*:)'
+            if re.search(range_pattern, line):
+                line = re.sub(range_pattern, r'\1range(\2)\3', line)
+                fixes_applied.append(f"Fixed range usage in for loop at line {i+1}")
+                made_changes = True
+            
+            new_lines.append(line)
+        
+        fixed_code = '\n'.join(new_lines)
+        
+        # Check if we fixed the syntax
+        try:
+            ast.parse(fixed_code)
+            success = True
+            break  # Successfully fixed!
+        except SyntaxError as e:
+            if not made_changes:
+                # No more fixes possible
+                remaining_errors.append(f"Could not fix: {e.msg} at line {e.lineno}")
+                break
+            # Continue trying more fixes
+            remaining_errors = [f"Attempt {attempt}: {e.msg} at line {e.lineno}"]
+    
+    # Final validation
     try:
         ast.parse(fixed_code)
         success = True
+        remaining_errors = []  # Clear errors if finally successful
     except SyntaxError as e:
         success = False
-        remaining_errors.append(f"Remaining SyntaxError: {e.msg} at line {e.lineno}")
+        remaining_errors.append(f"Final error: {e.msg} at line {e.lineno}")
+    
+    # Additional code improvements (even if syntax is correct)
+    if success:
+        improvement_lines = fixed_code.splitlines()
+        improved_lines = []
+        
+        for i, line in enumerate(improvement_lines):
+            # Improve coding style
+            original_line = line
+            
+            # Fix spacing around operators
+            if '=' in line and not any(op in line for op in ['==', '!=', '>=', '<=']) and not line.strip().startswith('#'):
+                line = re.sub(r'([a-zA-Z_]\w*)\s*=\s*', r'\1 = ', line)
+                if line != original_line:
+                    fixes_applied.append(f"Improved spacing around assignment at line {i+1}")
+            
+            # Fix spacing in function calls
+            line = re.sub(r'(\w+)\(\s*([^)]*)\s*\)', lambda m: f"{m.group(1)}({m.group(2).strip()})", line)
+            
+            improved_lines.append(line)
+        
+        fixed_code = '\n'.join(improved_lines)
     
     if not fixes_applied:
-        fixes_applied.append("No automatic fixes could be applied to this code.")
+        fixes_applied.append("❌ No automatic fixes could be applied to this code.")
+        if remaining_errors:
+            fixes_applied.append("💡 Try checking: parentheses, quotes, colons, and indentation manually.")
     
     return {
         "success": success,
-        "original": code,
+        "original": original_code,
         "fixed": fixed_code,
         "fixes_applied": fixes_applied,
         "remaining_errors": remaining_errors
