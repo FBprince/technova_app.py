@@ -6068,8 +6068,8 @@ st.markdown(
     '</div>', 
     unsafe_allow_html=True
 )
-    match = re.search(print_pattern, line)
-    if match:
+        match = re.search(print_pattern, line)
+        if match:
                 print_content = match.group(1).strip()
                 if not print_content.startswith('('):
                     new_line = re.sub(print_pattern, f'print({print_content})', line)
@@ -7954,5 +7954,6 @@ st.markdown(
     '</div>', 
     unsafe_allow_html=True
 )
+
 
 
