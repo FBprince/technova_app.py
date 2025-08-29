@@ -5193,7 +5193,7 @@ def fix_python_code(code: str) -> dict:
             
             # 3. Fix print statements (Python 3 style)
             # Handle: print "hello" -> print("hello")
-            print_pattern = r'\bprint\s+([^(][^#]*?)(?:#.*)?
+            print_pattern = r'\bprint\s+([^(][^#]*?)(?:#.*)?'
 
 def analyze_python_enhanced(code: str):
     """Comprehensive Python code analysis with enhanced metrics"""
@@ -7954,3 +7954,4 @@ st.markdown(
     '</div>', 
     unsafe_allow_html=True
 )
+
