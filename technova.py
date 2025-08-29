@@ -3637,6 +3637,1241 @@
 
 
 
+# import streamlit as st
+# import requests
+# from bs4 import BeautifulSoup
+# import re
+# import base64
+# import ast
+# from collections import Counter, defaultdict
+# import io
+
+# # PDF extraction (optional)
+# try:
+#     import PyPDF2
+#     PDF_AVAILABLE = True
+# except ImportError:
+#     PDF_AVAILABLE = False
+
+# # Page config
+# st.set_page_config(
+#     page_title="Technova AI Nexus", 
+#     layout="wide", 
+#     initial_sidebar_state="collapsed"
+# )
+
+# # Simple and reliable copy function using streamlit components
+# def copy_button(text: str, label: str = "Copy", key: str = None):
+#     """Simple copy button using streamlit text area"""
+#     if text is None:
+#         text = ""
+    
+#     button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(text[:50]))}"
+#     area_key = f"copy_area_{key}" if key else f"copy_area_{abs(hash(text[:50]))}"
+    
+#     # Show copy button and text area side by side
+#     col1, col2 = st.columns([1, 6])
+    
+#     with col1:
+#         st.button(f"📋 {label}", key=button_key, help="Click to show text for copying")
+    
+#     with col2:
+#         st.text_area(
+#             "Select all text below and copy (Ctrl+A, Ctrl+C):",
+#             value=text,
+#             height=120,
+#             key=area_key,
+#             help="Select all text and copy to clipboard"
+#         )
+
+# # Simplified styling
+# def set_tech_styling():
+#     st.markdown("""
+#     <style>
+#     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;500&display=swap');
+    
+#     .stApp {
+#         background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+#         color: #00f9ff;
+#         font-family: 'Rajdhani', sans-serif;
+#     }
+    
+#     h1, h2, h3, h4, h5, h6 {
+#         font-family: 'Orbitron', monospace !important;
+#         color: #00f9ff !important;
+#         text-shadow: 0 0 10px rgba(0, 249, 255, 0.5);
+#     }
+    
+#     .main-title {
+#         font-size: 3rem;
+#         text-align: center;
+#         background: linear-gradient(45deg, #00f9ff, #0099cc, #66ccff);
+#         -webkit-background-clip: text;
+#         -webkit-text-fill-color: transparent;
+#         background-clip: text;
+#         margin: 2rem 0;
+#     }
+    
+#     .subtitle {
+#         text-align: center;
+#         color: rgba(0, 249, 255, 0.8);
+#         font-style: italic;
+#         margin-bottom: 2rem;
+#     }
+    
+#     .stTextArea textarea, .stTextInput input {
+#         background: rgba(0, 20, 40, 0.8) !important;
+#         border: 1px solid rgba(0, 249, 255, 0.3) !important;
+#         color: #00f9ff !important;
+#     }
+    
+#     .stButton > button {
+#         background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3)) !important;
+#         border: 1px solid rgba(0, 249, 255, 0.5) !important;
+#         color: #00f9ff !important;
+#         font-weight: bold !important;
+#     }
+    
+#     .stTabs [data-baseweb="tab"] {
+#         color: #00f9ff !important;
+#         font-family: 'Orbitron', monospace !important;
+#     }
+    
+#     .stExpander {
+#         border: 1px solid rgba(0, 249, 255, 0.3);
+#         border-radius: 10px;
+#     }
+#     </style>
+#     """, unsafe_allow_html=True)
+
+# # Initialize styling
+# set_tech_styling()
+
+# # Main title
+# st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+# st.markdown('<p class="subtitle">Advanced AI-Powered Analysis Suite v2.1</p>', unsafe_allow_html=True)
+
+# # Stopwords for summarization
+# STOPWORDS = set([
+#     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", 
+#     "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", 
+#     "there", "these", "they", "this", "to", "was", "will", "with", "you", "your", "from", 
+#     "our", "we", "he", "she", "his", "her", "its", "were", "been", "being", "than", 
+#     "also", "can", "could", "should", "would", "may", "might", "have", "has", "had", 
+#     "do", "does", "did", "done", "just", "over", "under", "more", "most", "other", 
+#     "some", "any", "each", "many", "few", "those", "them", "which", "who", "whom", 
+#     "whose", "where", "when", "why", "how"
+# ])
+
+# def safe_sentence_split(text: str):
+#     """Split text into sentences safely"""
+#     pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+#     return [s.strip() for s in pattern.split(text) if s.strip()]
+
+# def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool = False) -> str:
+#     """Advanced text summarization using frequency analysis"""
+#     if not text or not text.strip():
+#         return "No content to summarize."
+    
+#     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
+#     sentences = []
+#     for para in paragraphs:
+#         sentences.extend(safe_sentence_split(para))
+    
+#     if not sentences:
+#         return text
+
+#     # Word frequency analysis
+#     word_freq = Counter()
+#     for s in sentences:
+#         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+#         for w in words:
+#             if w not in STOPWORDS and len(w) > 2:
+#                 word_freq[w] += 1
+    
+#     if not word_freq:
+#         return " ".join(sentences[:max_sentences])
+
+#     # Normalize frequencies
+#     max_freq = max(word_freq.values())
+#     for w in list(word_freq.keys()):
+#         word_freq[w] /= max_freq
+
+#     # Score sentences
+#     scored = []
+#     for idx, s in enumerate(sentences):
+#         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+#         score = sum(word_freq.get(w, 0.0) for w in words)
+#         length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20) / 20)
+#         position_boost = 1.1 if idx < 3 else 1.0
+#         scored.append((score / length_penalty * position_boost, idx, s))
+
+#     # Select top sentences
+#     scored.sort(key=lambda x: (-x[0], x[1]))
+#     top = sorted(scored[:max_sentences], key=lambda x: x[1])
+    
+#     if as_bullets:
+#         return "\n".join([f"• {s}" for _, _, s in top])
+#     return " ".join([s for _, _, s in top])
+
+# def analyze_python_enhanced(code: str):
+#     """Comprehensive Python code analysis with enhanced metrics"""
+#     report = {
+#         "basic_stats": {},
+#         "functions": [], 
+#         "classes": [], 
+#         "imports": [], 
+#         "variables": [],
+#         "purpose_summary": "", 
+#         "errors": [], 
+#         "warnings": [], 
+#         "fixes": [],
+#         "complexity_metrics": {},
+#         "code_quality": {},
+#         "detailed_counts": {},
+#         "builtin_functions_used": []  # Initialize this key
+#     }
+
+#     if not code or not code.strip():
+#         return report
+
+#     lines = code.splitlines()
+#     code_lines = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+#     comment_lines = [line for line in lines if line.strip().startswith("#")]
+#     blank_lines = [line for line in lines if not line.strip()]
+
+#     # Basic statistics
+#     report["basic_stats"] = {
+#         "total_lines": len(lines),
+#         "code_lines": len(code_lines),
+#         "comment_lines": len(comment_lines),
+#         "blank_lines": len(blank_lines),
+#         "characters": len(code),
+#         "words": len(code.split())
+#     }
+
+#     # Initialize counters
+#     function_count = 0
+#     class_count = 0
+#     import_count = 0
+#     print_count = 0
+#     if_count = 0
+#     for_count = 0
+#     while_count = 0
+#     try_count = 0
+#     with_count = 0
+#     def_count = 0
+#     lambda_count = 0
+#     list_comp_count = 0
+#     dict_comp_count = 0
+
+#     # Pattern-based counting
+#     for line in code_lines:
+#         stripped_line = line.strip()
+        
+#         # Count various constructs
+#         if stripped_line.startswith("def "):
+#             def_count += 1
+#         if stripped_line.startswith("class "):
+#             class_count += 1
+#         if stripped_line.startswith(("import ", "from ")):
+#             import_count += 1
+        
+#         # Count control structures and statements
+#         print_count += len(re.findall(r'\bprint\s*\(', line))
+#         if_count += len(re.findall(r'\bif\b', line))
+#         for_count += len(re.findall(r'\bfor\b', line))
+#         while_count += len(re.findall(r'\bwhile\b', line))
+#         try_count += len(re.findall(r'\btry\b', line))
+#         with_count += len(re.findall(r'\bwith\b', line))
+#         lambda_count += len(re.findall(r'\blambda\b', line))
+#         list_comp_count += len(re.findall(r'\[.*for.*in.*\]', line))
+#         dict_comp_count += len(re.findall(r'\{.*for.*in.*\}', line))
+
+#     report["detailed_counts"] = {
+#         "functions": def_count,
+#         "classes": class_count,
+#         "imports": import_count,
+#         "print_statements": print_count,
+#         "if_statements": if_count,
+#         "for_loops": for_count,
+#         "while_loops": while_count,
+#         "try_blocks": try_count,
+#         "with_statements": with_count,
+#         "lambda_expressions": lambda_count,
+#         "list_comprehensions": list_comp_count,
+#         "dict_comprehensions": dict_comp_count
+#     }
+
+#     # Calculate complexity metrics
+#     total_constructs = sum([if_count, for_count, while_count, try_count, def_count])
+#     complexity_score = total_constructs / max(1, len(code_lines)) * 100
+    
+#     report["complexity_metrics"] = {
+#         "cyclomatic_complexity_estimate": total_constructs + 1,
+#         "complexity_per_line": round(complexity_score, 2),
+#         "nesting_level_estimate": max(0, len(re.findall(r'    ', code)) // len(code_lines) * 10) if code_lines else 0
+#     }
+
+#     # Code quality metrics
+#     comment_ratio = len(comment_lines) / max(1, len(lines)) * 100
+#     avg_line_length = sum(len(line) for line in code_lines) / max(1, len(code_lines))
+    
+#     report["code_quality"] = {
+#         "comment_ratio": round(comment_ratio, 2),
+#         "avg_line_length": round(avg_line_length, 2),
+#         "code_to_comment_ratio": round(len(code_lines) / max(1, len(comment_lines)), 2)
+#     }
+
+#     # Basic parsing for simple analysis
+#     for line in code_lines:
+#         stripped = line.strip()
+#         if stripped.startswith("def "):
+#             match = re.match(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)", stripped)
+#             if match:
+#                 report["functions"].append(match.group(1))
+#         elif stripped.startswith("class "):
+#             match = re.match(r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)", stripped)
+#             if match:
+#                 report["classes"].append(match.group(1))
+#         elif stripped.startswith(("import ", "from ")):
+#             report["imports"].append(stripped)
+
+#     # Generate purpose summary
+#     report["purpose_summary"] = summarize_text_advanced(code, max_sentences=3)
+
+#     # AST analysis for deeper insights
+#     try:
+#         tree = ast.parse(code)
+#     except SyntaxError as e:
+#         report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
+#         report["fixes"].append("Check syntax: indentation, colons, parentheses, quotes.")
+#         return report
+
+#     # Enhanced AST analysis
+#     imported_names = set()
+#     used_names = set()
+#     assigned_names = set()
+#     builtin_functions_used = set()
+    
+#     builtin_funcs = {
+#         'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate', 
+#         'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input', 
+#         'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 
+#         'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round', 
+#         'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+#     }
+
+#     class EnhancedCodeAnalyzer(ast.NodeVisitor):
+#         def visit_Import(self, node):
+#             for alias in node.names:
+#                 imported_names.add(alias.asname or alias.name.split(".")[0])
+#             self.generic_visit(node)
+
+#         def visit_ImportFrom(self, node):
+#             for alias in node.names:
+#                 imported_names.add(alias.asname or alias.name)
+#             self.generic_visit(node)
+
+#         def visit_FunctionDef(self, node):
+#             assigned_names.add(node.name)
+#             # Check for mutable default arguments
+#             for default in node.args.defaults:
+#                 if isinstance(default, (ast.List, ast.Dict, ast.Set)):
+#                     report["warnings"].append(f"Mutable default argument in '{node.name}'")
+#                     report["fixes"].append(f"Use None as default in '{node.name}' and create objects inside function")
+            
+#             # Check for long functions
+#             func_lines = len([n for n in ast.walk(node) if hasattr(n, 'lineno')])
+#             if func_lines > 50:
+#                 report["warnings"].append(f"Function '{node.name}' is very long ({func_lines} lines)")
+#                 report["fixes"].append(f"Consider breaking down '{node.name}' into smaller functions")
+            
+#             self.generic_visit(node)
+
+#         def visit_ClassDef(self, node):
+#             assigned_names.add(node.name)
+#             self.generic_visit(node)
+
+#         def visit_Name(self, node):
+#             if isinstance(node.ctx, ast.Load):
+#                 used_names.add(node.id)
+#                 if node.id in builtin_funcs:
+#                     builtin_functions_used.add(node.id)
+#             elif isinstance(node.ctx, ast.Store):
+#                 assigned_names.add(node.id)
+#                 report["variables"].append(node.id)
+#             self.generic_visit(node)
+
+#         def visit_Call(self, node):
+#             if isinstance(node.func, ast.Name):
+#                 if node.func.id in {"eval", "exec"}:
+#                     report["warnings"].append(f"Dangerous {node.func.id} usage detected")
+#                     report["fixes"].append(f"Avoid {node.func.id}; use safer alternatives")
+#                 elif node.func.id == "print" and len(node.args) == 0:
+#                     report["warnings"].append("Empty print() statement found")
+#                     report["fixes"].append("Remove empty print() or add meaningful content")
+#             self.generic_visit(node)
+
+#     EnhancedCodeAnalyzer().visit(tree)
+
+#     # Add builtin functions used to report
+#     report["builtin_functions_used"] = sorted(list(builtin_functions_used))
+
+#     # Check for unused imports
+#     unused_imports = []
+#     for name in sorted(imported_names):
+#         if name not in used_names and name not in {"__future__"}:
+#             unused_imports.append(name)
+#             report["warnings"].append(f"Possibly unused import: '{name}'")
+#             report["fixes"].append(f"Remove unused import '{name}' if not needed")
+
+#     # Check for builtin shadowing
+#     builtins_list = [
+#         'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate', 
+#         'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input', 
+#         'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 
+#         'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round', 
+#         'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
+#     ]
+    
+#     shadowed_builtins = []
+#     for name in assigned_names:
+#         if name in builtins_list:
+#             shadowed_builtins.append(name)
+#             report["warnings"].append(f"Variable '{name}' shadows builtin")
+#             report["fixes"].append(f"Rename '{name}' to avoid shadowing builtins")
+
+#     # Code quality analysis
+#     if report["code_quality"]["comment_ratio"] < 5:
+#         report["warnings"].append("Low comment density - consider adding more documentation")
+#         report["fixes"].append("Add docstrings to functions and classes, and inline comments for complex logic")
+    
+#     if report["code_quality"]["avg_line_length"] > 100:
+#         report["warnings"].append("Some lines are very long - consider breaking them up")
+#         report["fixes"].append("Break long lines at logical points (after commas, operators, etc.)")
+
+#     # Add general recommendations
+#     if not report["errors"]:
+#         if not report["warnings"]:
+#             report["fixes"].append("🎉 Code looks excellent! Consider adding unit tests and type hints.")
+#         else:
+#             report["fixes"].append("Review warnings above and apply suggested fixes for better code quality.")
+
+#     # Remove duplicate variables
+#     report["variables"] = sorted(list(set(report["variables"])))
+
+#     return report
+
+# def detect_ai_generated_code(code: str) -> dict:
+#     """Detect if code might be AI-generated based on patterns"""
+#     if not code or not code.strip():
+#         return {"score": 0, "label": "❓ No content", "reasons": [], "features": {}}
+    
+#     lines = code.splitlines()
+#     code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+#     comment_lines = [ln for ln in lines if ln.strip().startswith("#")]
+    
+#     features = {}
+#     total_lines = max(1, len(lines))
+    
+#     # Comment density
+#     features["comment_density"] = len(comment_lines) / total_lines
+    
+#     # Repeated lines
+#     normalized = [re.sub(r"\s+", " ", ln.strip()) for ln in code_lines]
+#     counts = Counter(normalized)
+#     repeated = sum(c for c in counts.values() if c > 1)
+#     features["repeated_line_ratio"] = repeated / max(1, len(code_lines))
+    
+#     # Generic variable names
+#     generic_names = {"data", "result", "temp", "value", "item", "input", "output", "res", "var", "obj"}
+#     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
+#     generic_count = sum(1 for t in tokens if t in generic_names)
+#     features["generic_name_density"] = generic_count / max(1, len(tokens))
+    
+#     # Perfect formatting (suspicious)
+#     perfect_indent = all(len(line) - len(line.lstrip()) % 4 == 0 for line in code_lines if line.strip())
+#     features["perfect_formatting"] = 1.0 if perfect_indent and len(code_lines) > 10 else 0.0
+    
+#     # Calculate score
+#     score = (
+#         25 * min(1.0, abs(features["comment_density"] - 0.15) / 0.15) +
+#         35 * features["repeated_line_ratio"] +
+#         20 * min(1.0, features["generic_name_density"] * 20) +
+#         20 * features["perfect_formatting"]
+#     )
+    
+#     score = max(0.0, min(100.0, score))
+    
+#     # Determine label
+#     if score >= 70:
+#         label = "🚨 Likely AI-generated"
+#     elif score >= 45:
+#         label = "🤔 Unclear/Mixed"
+#     else:
+#         label = "✅ Likely human-written"
+    
+#     # Generate reasons
+#     reasons = []
+#     if features["repeated_line_ratio"] > 0.1:
+#         reasons.append("High repetition of similar code patterns")
+#     if features["comment_density"] < 0.02 or features["comment_density"] > 0.4:
+#         reasons.append("Unusual comment density")
+#     if features["generic_name_density"] > 0.03:
+#         reasons.append("Frequent generic variable names")
+#     if features["perfect_formatting"] == 1.0:
+#         reasons.append("Suspiciously perfect code formatting")
+    
+#     return {
+#         "score": round(score, 1), 
+#         "label": label, 
+#         "reasons": reasons, 
+#         "features": features
+#     }
+
+# def fetch_from_url(url: str) -> str:
+#     """Fetch and extract text content from URL"""
+#     try:
+#         headers = {
+#             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+#         }
+#         resp = requests.get(url, timeout=10, headers=headers)
+#         resp.raise_for_status()
+        
+#         content_type = resp.headers.get("Content-Type", "")
+#         if "text/html" in content_type:
+#             soup = BeautifulSoup(resp.text, "html.parser")
+#             # Remove unwanted elements
+#             for element in soup(["script", "style", "nav", "header", "footer", "aside"]):
+#                 element.extract()
+#             return soup.get_text(separator="\n", strip=True)
+#         else:
+#             return resp.text
+            
+#     except requests.exceptions.RequestException as e:
+#         return f"❌ Error fetching URL: {str(e)}"
+#     except Exception as e:
+#         return f"❌ Error processing content: {str(e)}"
+
+# # Create tabs
+# tabs = st.tabs([
+#     "📄 Document Processor", 
+#     "🧠 Code Analyzer", 
+#     "🤖 AI Detection", 
+#     "🌐 URL Extractor"
+# ])
+
+# # Tab 1: Document Processor
+# with tabs[0]:
+#     st.header("📄 Neural Document Processor")
+#     st.write("*Advanced text analysis and summarization*")
+    
+#     col1, col2 = st.columns([2, 1])
+    
+#     with col1:
+#         doc_text = st.text_area(
+#             "Input Text", 
+#             height=200, 
+#             placeholder="Paste your document content here...",
+#             key="doc_text_input"
+#         )
+    
+#     with col2:
+#         doc_file = st.file_uploader("Upload Document", type=["txt", "md", "pdf"], key="doc_file_upload")
+#         doc_url = st.text_input("Document URL", placeholder="https://...", key="doc_url_input")
+#         doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
+#         doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
+
+#     if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
+#         content = ""
+        
+#         # Get content from various sources
+#         if doc_file:
+#             if doc_file.name.lower().endswith(".pdf"):
+#                 if not PDF_AVAILABLE:
+#                     st.error("PDF processing requires PyPDF2. Install with: pip install PyPDF2")
+#                 else:
+#                     try:
+#                         reader = PyPDF2.PdfReader(io.BytesIO(doc_file.read()))
+#                         pages_text = []
+#                         for page in reader.pages:
+#                             pages_text.append(page.extract_text() or "")
+#                         content = "\n".join(pages_text)
+#                     except Exception as e:
+#                         st.error(f"PDF error: {e}")
+#             else:
+#                 content = doc_file.read().decode("utf-8", errors="ignore")
+#         elif doc_url.strip():
+#             with st.spinner("Fetching content..."):
+#                 content = fetch_from_url(doc_url.strip())
+#         elif doc_text.strip():
+#             content = doc_text
+
+#         if not content:
+#             st.warning("Please provide content via text, file, or URL.")
+#         elif content.startswith("❌"):
+#             st.error(content)
+#         else:
+#             with st.spinner("Processing..."):
+#                 summary = summarize_text_advanced(content, doc_length, doc_bullets)
+            
+#             st.success("Analysis Complete!")
+            
+#             # Show summary FIRST (most important)
+#             st.subheader("📋 Generated Summary")
+#             if doc_bullets:
+#                 st.markdown(summary)
+#             else:
+#                 st.write(summary)
+            
+#             # Copy functionality for summary
+#             st.subheader("📋 Copy Summary")
+#             copy_button(summary, "Copy Summary", key="doc_summary")
+            
+#             # Then show document metrics
+#             st.subheader("📊 Document Statistics")
+#             col1, col2, col3, col4 = st.columns(4)
+#             with col1:
+#                 st.metric("Characters", f"{len(content):,}")
+#             with col2:
+#                 st.metric("Words", f"{len(content.split()):,}")
+#             with col3:
+#                 st.metric("Lines", f"{len(content.splitlines()):,}")
+#             with col4:
+#                 st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
+            
+#             # Download option
+#             st.download_button(
+#                 "💾 Download Summary", 
+#                 summary, 
+#                 "summary.txt",
+#                 mime="text/plain",
+#                 key="doc_download_btn"
+#             )
+
+# # Tab 2: Enhanced Code Analyzer with reordered sections
+# with tabs[1]:
+#     st.header("🧠 Quantum Code Analyzer")
+#     st.write("*Deep code analysis with comprehensive metrics and optimization recommendations*")
+    
+#     col1, col2 = st.columns([2, 1])
+    
+#     with col1:
+#         code_text = st.text_area(
+#             "Python Code", 
+#             height=250, 
+#             placeholder="Paste your Python code here...",
+#             key="code_text_input"
+#         )
+    
+#     with col2:
+#         code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
+#         code_url = st.text_input("Code URL", placeholder="https://...", key="code_url_input")
+
+#     if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
+#         code_content = ""
+        
+#         if code_file:
+#             code_content = code_file.read().decode("utf-8", errors="ignore")
+#         elif code_url.strip():
+#             with st.spinner("Fetching code..."):
+#                 code_content = fetch_from_url(code_url.strip())
+#         elif code_text.strip():
+#             code_content = code_text
+
+#         if not code_content:
+#             st.warning("Please provide code via input, file, or URL.")
+#         elif code_content.startswith("❌"):
+#             st.error(code_content)
+#         else:
+#             with st.expander("Code Preview", expanded=False):
+#                 st.code(code_content, language="python")
+
+#             with st.spinner("Analyzing code..."):
+#                 report = analyze_python_enhanced(code_content)
+
+#             st.success("🎉 Analysis Complete!")
+
+#             # PRIORITY SECTION 1: ERRORS (Most Important)
+#             st.header("❌ Errors")
+#             if report["errors"]:
+#                 for error in report["errors"]:
+#                     st.error(error)
+#             else:
+#                 st.success("✅ No syntax errors found!")
+            
+#             # PRIORITY SECTION 2: WARNINGS
+#             st.header("⚠️ Warnings")
+#             if report["warnings"]:
+#                 for warning in report["warnings"]:
+#                     st.warning(warning)
+#             else:
+#                 st.success("✅ No warnings!")
+            
+#             # PRIORITY SECTION 3: SUGGESTIONS/RECOMMENDATIONS
+#             st.header("💡 Suggestions & Recommendations")
+#             for fix in report["fixes"]:
+#                 st.info(fix)
+            
+#             # PRIORITY SECTION 4: CODE SUMMARY
+#             st.header("📋 Code Summary")
+#             st.write(report["purpose_summary"])
+            
+#             # Copy functionality for main analysis
+#             st.header("📋 Copy Analysis Report")
+#             formatted_report = f"""
+# CODE ANALYSIS REPORT
+# ==================
+
+# ERRORS ({len(report['errors'])} found):
+# {chr(10).join(f"- {error}" for error in report['errors']) if report['errors'] else "✅ No errors"}
+
+# WARNINGS ({len(report['warnings'])} found):
+# {chr(10).join(f"- {warning}" for warning in report['warnings']) if report['warnings'] else "✅ No warnings"}
+
+# RECOMMENDATIONS:
+# {chr(10).join(f"- {fix}" for fix in report['fixes'])}
+
+# CODE SUMMARY:
+# {report['purpose_summary']}
+
+# FUNCTIONS FOUND ({len(report['functions'])}):
+# {', '.join(report['functions']) if report['functions'] else "None"}
+
+# CLASSES FOUND ({len(report['classes'])}):
+# {', '.join(report['classes']) if report['classes'] else "None"}
+
+# DETAILED STATISTICS:
+# - Total Lines: {report['basic_stats'].get('total_lines', 0)}
+# - Code Lines: {report['basic_stats'].get('code_lines', 0)}
+# - Comment Lines: {report['basic_stats'].get('comment_lines', 0)}
+# - Functions: {report['detailed_counts'].get('functions', 0)}
+# - Classes: {report['detailed_counts'].get('classes', 0)}
+# - Imports: {report['detailed_counts'].get('imports', 0)}
+# - Print Statements: {report['detailed_counts'].get('print_statements', 0)}
+# - If Statements: {report['detailed_counts'].get('if_statements', 0)}
+# - For Loops: {report['detailed_counts'].get('for_loops', 0)}
+# - While Loops: {report['detailed_counts'].get('while_loops', 0)}
+# """
+#             copy_button(formatted_report, "Copy Full Report", key="code_report")
+            
+#             # NOW SHOW DETAILED METRICS (Lower Priority)
+#             st.header("📊 Detailed Code Metrics")
+            
+#             # Functions and Classes Found
+#             col1, col2 = st.columns(2)
+            
+#             with col1:
+#                 if report["functions"]:
+#                     st.subheader("🔧 Functions Found")
+#                     for func in report["functions"][:10]:  # Show first 10
+#                         st.write(f"• `{func}()`")
+#                     if len(report["functions"]) > 10:
+#                         st.write(f"... and {len(report['functions']) - 10} more")
+                
+#                 # SAFE ACCESS TO builtin_functions_used - FIXED LINE
+#                 builtin_functions = report.get("builtin_functions_used", [])
+#                 if builtin_functions:
+#                     st.subheader("🐍 Built-in Functions Used")
+#                     builtin_display = ", ".join(f"`{func}()`" for func in builtin_functions[:15])
+#                     st.write(builtin_display)
+#                     if len(builtin_functions) > 15:
+#                         st.write(f"... and {len(builtin_functions) - 15} more")
+            
+#             with col2:
+#                 if report["classes"]:
+#                     st.subheader("🏗️ Classes Found")
+#                     for cls in report["classes"]:
+#                         st.write(f"• `{cls}`")
+                
+#                 if report["variables"]:
+#                     st.subheader("📝 Variables")
+#                     variables_display = ", ".join(f"`{var}`" for var in report["variables"][:20])
+#                     st.write(variables_display)
+#                     if len(report["variables"]) > 20:
+#                         st.write(f"... and {len(report['variables']) - 20} more variables")
+
+#             # Basic Statistics Section
+#             st.subheader("📈 Line Statistics")
+#             col1, col2, col3, col4 = st.columns(4)
+            
+#             with col1:
+#                 st.metric("Total Lines", report["basic_stats"].get("total_lines", 0))
+#                 st.metric("Functions", report["detailed_counts"].get("functions", 0))
+#             with col2:
+#                 st.metric("Code Lines", report["basic_stats"].get("code_lines", 0))
+#                 st.metric("Classes", report["detailed_counts"].get("classes", 0))
+#             with col3:
+#                 st.metric("Comments", report["basic_stats"].get("comment_lines", 0))
+#                 st.metric("Imports", report["detailed_counts"].get("imports", 0))
+#             with col4:
+#                 st.metric("Characters", f"{report['basic_stats'].get('characters', 0):,}")
+#                 st.metric("Print Statements", report["detailed_counts"].get("print_statements", 0))
+
+#             # Detailed Counts Section
+#             st.subheader("🔧 Code Constructs")
+#             col1, col2, col3, col4 = st.columns(4)
+            
+#             with col1:
+#                 st.metric("If Statements", report["detailed_counts"].get("if_statements", 0))
+#                 st.metric("For Loops", report["detailed_counts"].get("for_loops", 0))
+#             with col2:
+#                 st.metric("While Loops", report["detailed_counts"].get("while_loops", 0))
+#                 st.metric("Try Blocks", report["detailed_counts"].get("try_blocks", 0))
+#             with col3:
+#                 st.metric("With Statements", report["detailed_counts"].get("with_statements", 0))
+#                 st.metric("Lambda Expressions", report["detailed_counts"].get("lambda_expressions", 0))
+#             with col4:
+#                 st.metric("List Comprehensions", report["detailed_counts"].get("list_comprehensions", 0))
+#                 st.metric("Dict Comprehensions", report["detailed_counts"].get("dict_comprehensions", 0))
+
+#             # Code Quality Metrics
+#             st.subheader("📊 Quality Metrics")
+#             col1, col2, col3 = st.columns(3)
+            
+#             with col1:
+#                 comment_ratio = report["code_quality"].get("comment_ratio", 0)
+#                 st.metric("Comment Ratio", f"{comment_ratio:.1f}%")
+                
+#             with col2:
+#                 avg_line_length = report["code_quality"].get("avg_line_length", 0)
+#                 st.metric("Avg Line Length", f"{avg_line_length:.1f} chars")
+                
+#             with col3:
+#                 complexity = report["complexity_metrics"].get("cyclomatic_complexity_estimate", 0)
+#                 st.metric("Complexity Score", complexity)
+
+#             # Imports and Variables Details
+#             with st.expander("📦 Imports & Variables Details", expanded=False):
+#                 col1, col2 = st.columns(2)
+                
+#                 with col1:
+#                     if report["imports"]:
+#                         st.subheader("📥 Imports")
+#                         for imp in report["imports"]:
+#                             st.code(imp, language="python")
+#                     else:
+#                         st.write("No imports found")
+                
+#                 with col2:
+#                     if report["variables"]:
+#                         st.subheader("📝 All Variables")
+#                         variables_display = ", ".join(f"`{var}`" for var in report["variables"])
+#                         st.write(variables_display)
+#                     else:
+#                         st.write("No variables detected")
+            
+#             # Download option
+#             st.download_button(
+#                 "💾 Download Full Report", 
+#                 formatted_report, 
+#                 "code_analysis_report.txt",
+#                 mime="text/plain",
+#                 key="code_download_btn"
+#             )
+
+# # Tab 3: AI Detection with reordered sections
+# with tabs[2]:
+#     st.header("🤖 AI Detection Matrix")
+#     st.write("*Advanced pattern recognition for AI-generated content*")
+    
+#     col1, col2 = st.columns([3, 1])
+    
+#     with col1:
+#         ai_text = st.text_area(
+#             "Content for Analysis", 
+#             height=200, 
+#             placeholder="Paste text or code to analyze for AI patterns...",
+#             key="ai_text_input"
+#         )
+    
+#     with col2:
+#         ai_file = st.file_uploader("Upload File", type=["txt", "py", "md"], key="ai_file_upload")
+#         ai_url = st.text_input("Content URL", placeholder="https://...", key="ai_url_input")
+
+#     if st.button("🔬 Scan for AI Patterns", type="primary", key="ai_analyze_btn"):
+#         content = ""
+        
+#         if ai_file:
+#             content = ai_file.read().decode("utf-8", errors="ignore")
+#         elif ai_url.strip():
+#             with st.spinner("Fetching content..."):
+#                 content = fetch_from_url(ai_url.strip())
+#         elif ai_text.strip():
+#             content = ai_text
+
+#         if not content:
+#             st.warning("Please provide content for analysis.")
+#         elif content.startswith("❌"):
+#             st.error(content)
+#         else:
+#             with st.spinner("Analyzing patterns..."):
+#                 result = detect_ai_generated_code(content)
+            
+#             st.success("🔍 Analysis Complete!")
+            
+#             # PRIORITY 1: MAIN ASSESSMENT (Most Important)
+#             score_val = result['score']
+#             if score_val < 45:
+#                 color = "#00ff00"
+#                 interpretation = "Human-like patterns detected"
+#             elif score_val < 65:
+#                 color = "#ffaa00"
+#                 interpretation = "Mixed or uncertain patterns"
+#             else:
+#                 color = "#ff4444"
+#                 interpretation = "AI-like patterns detected"
+            
+#             st.header(f"🎯 AI Detection Result: {result['label']}")
+            
+#             # Visual score indicator
+#             col1, col2, col3 = st.columns([1, 2, 1])
+#             with col2:
+#                 st.metric(
+#                     "AI Likelihood Score", 
+#                     f"{score_val}%",
+#                     delta=f"{score_val - 50:+.1f}% vs baseline",
+#                     delta_color="inverse"
+#                 )
+                
+#                 # Progress bar for visual representation
+#                 st.markdown(f"""
+#                 <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 5px; margin: 10px 0;">
+#                     <div style="background: {color}; height: 20px; width: {score_val}%; border-radius: 8px; transition: all 0.3s;"></div>
+#                 </div>
+#                 <p style="text-align: center; color: {color}; font-weight: bold;">{interpretation}</p>
+#                 """, unsafe_allow_html=True)
+            
+#             # PRIORITY 2: KEY INDICATORS
+#             st.header("🔍 Key Indicators")
+#             if result["reasons"]:
+#                 for i, reason in enumerate(result["reasons"], 1):
+#                     st.warning(f"{i}. {reason}")
+#             else:
+#                 st.success("✅ No significant AI patterns detected")
+            
+#             # PRIORITY 3: COPY FUNCTIONALITY
+#             st.header("📋 Copy Detection Report")
+#             detection_report = f"""
+# AI DETECTION ANALYSIS REPORT
+# ============================
+
+# OVERALL ASSESSMENT: {result['label']}
+# CONFIDENCE SCORE: {result['score']}%
+# INTERPRETATION: {interpretation}
+
+# KEY INDICATORS:
+# {chr(10).join(f"- {reason}" for reason in result['reasons']) if result['reasons'] else "- No significant patterns detected"}
+
+# DETAILED FEATURE ANALYSIS:
+# {chr(10).join(f"- {k.replace('_', ' ').title()}: {v:.3f}" for k, v in result['features'].items())}
+
+# CONFIDENCE BREAKDOWN:
+# - Comment Pattern Score: {abs(result['features'].get('comment_density', 0) - 0.15) / 0.15:.2f}
+# - Code Repetition Score: {result['features'].get('repeated_line_ratio', 0):.2f}
+# - Generic Names Score: {result['features'].get('generic_name_density', 0):.2f}
+# - Perfect Format Score: {result['features'].get('perfect_formatting', 0):.2f}
+# """
+#             copy_button(detection_report, "Copy Detection Report", key="ai_report")
+            
+#             # LOWER PRIORITY: DETAILED METRICS
+#             st.header("📊 Detailed Feature Analysis")
+            
+#             col1, col2 = st.columns(2)
+            
+#             with col1:
+#                 st.write("**📈 Pattern Metrics:**")
+#                 for feature, value in result["features"].items():
+#                     feature_name = feature.replace("_", " ").title()
+                    
+#                     # Color code based on feature values
+#                     if "density" in feature or "ratio" in feature:
+#                         if value > 0.3:
+#                             color_indicator = "🔴"
+#                         elif value > 0.15:
+#                             color_indicator = "🟡"
+#                         else:
+#                             color_indicator = "🟢"
+#                     else:
+#                         color_indicator = "🔵"
+                    
+#                     st.write(f"{color_indicator} **{feature_name}:** `{value:.3f}`")
+            
+#             with col2:
+#                 st.write("**🎯 Confidence Breakdown:**")
+                
+#                 # Create confidence indicators for each feature
+#                 features = result["features"]
+                
+#                 if "comment_density" in features:
+#                     cd_score = abs(features["comment_density"] - 0.15) / 0.15
+#                     st.write(f"📝 Comment Pattern: `{cd_score:.2f}` {'⚠️' if cd_score > 0.5 else '✅'}")
+                
+#                 if "repeated_line_ratio" in features:
+#                     rr_score = features["repeated_line_ratio"]
+#                     st.write(f"🔄 Code Repetition: `{rr_score:.2f}` {'⚠️' if rr_score > 0.1 else '✅'}")
+                
+#                 if "generic_name_density" in features:
+#                     gn_score = features["generic_name_density"]
+#                     st.write(f"🏷️ Generic Names: `{gn_score:.2f}` {'⚠️' if gn_score > 0.03 else '✅'}")
+                
+#                 if "perfect_formatting" in features:
+#                     pf_score = features["perfect_formatting"]
+#                     st.write(f"✨ Perfect Format: `{pf_score:.2f}` {'⚠️' if pf_score > 0.5 else '✅'}")
+            
+#             # Download option
+#             st.download_button(
+#                 "💾 Download Analysis", 
+#                 detection_report, 
+#                 "ai_detection_report.txt",
+#                 mime="text/plain",
+#                 key="ai_download_btn"
+#             )
+
+# # Tab 4: URL Extractor with reordered sections
+# with tabs[3]:
+#     st.header("🌐 URL Data Extraction Engine")
+#     st.write("*Advanced web content extraction and intelligent analysis*")
+    
+#     col1, col2 = st.columns([3, 1])
+    
+#     with col1:
+#         url_input = st.text_input(
+#             "🎯 Target URL", 
+#             placeholder="Enter any URL for intelligent content extraction...",
+#             key="url_input_field",
+#             help="Supports web pages, GitHub files, documentation, articles, and more"
+#         )
+    
+#     with col2:
+#         url_length = st.slider("Summary Length", 1, 15, 7, key="url_summary_length")
+#         url_bullets = st.checkbox("Use Bullet Points", value=True, key="url_use_bullets")
+#         url_show_preview = st.checkbox("Show Content Preview", value=True, key="url_show_preview")
+
+#     if st.button("🚀 Extract & Analyze", type="primary", key="url_analyze_btn"):
+#         if not url_input.strip():
+#             st.warning("⚠️ Please enter a valid URL to proceed.")
+#         else:
+#             with st.spinner("🔄 Extracting content from URL..."):
+#                 content = fetch_from_url(url_input.strip())
+            
+#             if content.startswith("❌"):
+#                 st.error(content)
+#             else:
+#                 st.success("✅ Content extracted successfully!")
+                
+#                 # Generate enhanced summary
+#                 with st.spinner("🧠 Generating intelligent summary..."):
+#                     summary = summarize_text_advanced(content, url_length, url_bullets)
+                
+#                 # PRIORITY 1: SUMMARY (Most Important)
+#                 st.header("🎯 Intelligent Content Summary")
+#                 if url_bullets:
+#                     st.markdown(summary)
+#                 else:
+#                     st.write(summary)
+                
+#                 # PRIORITY 2: COPY FUNCTIONALITY
+#                 st.header("📋 Copy Summary")
+#                 copy_button(summary, "Copy Summary", key="url_summary")
+                
+#                 # Enhanced metrics display (LOWER PRIORITY)
+#                 words = content.split()
+#                 sentences = len(re.findall(r'[.!?]+', content))
+#                 paragraphs = len([p for p in content.split('\n\n') if p.strip()])
+                
+#                 # Reading time estimation
+#                 avg_reading_speed = 200  # words per minute
+#                 reading_time = max(1, len(words) // avg_reading_speed)
+#                 st.info(f"📚 Estimated reading time: ~{reading_time} minute{'s' if reading_time != 1 else ''}")
+                
+#                 st.header("📊 Content Statistics")
+#                 col1, col2, col3, col4, col5 = st.columns(5)
+#                 with col1:
+#                     st.metric("📄 Characters", f"{len(content):,}")
+#                 with col2:
+#                     st.metric("📝 Words", f"{len(words):,}")
+#                 with col3:
+#                     st.metric("📋 Lines", f"{len(content.splitlines()):,}")
+#                 with col4:
+#                     st.metric("📖 Sentences", f"{sentences:,}")
+#                 with col5:
+#                     st.metric("📑 Paragraphs", f"{paragraphs:,}")
+                
+#                 # Content preview with better formatting
+#                 if url_show_preview:
+#                     with st.expander("📄 Content Preview", expanded=False):
+#                         preview_length = 3000
+#                         preview = content[:preview_length]
+#                         if len(content) > preview_length:
+#                             preview += f"\n\n... [Content truncated - showing first {preview_length:,} characters of {len(content):,} total]"
+                        
+#                         # Try to detect if it's code
+#                         if any(keyword in content.lower()[:500] for keyword in ['def ', 'class ', 'import ', 'function', '#include', 'public class']):
+#                             st.code(preview, language="python" if "def " in preview or "import " in preview else "text")
+#                         else:
+#                             st.text(preview)
+                
+#                 # Additional analysis
+#                 with st.expander("📊 Content Analysis", expanded=False):
+#                     col1, col2 = st.columns(2)
+                    
+#                     with col1:
+#                         st.write("**📈 Content Statistics:**")
+#                         avg_word_length = sum(len(word) for word in words) / max(len(words), 1)
+#                         st.write(f"• Average word length: {avg_word_length:.1f} characters")
+                        
+#                         if sentences > 0:
+#                             avg_sentence_length = len(words) / sentences
+#                             st.write(f"• Average sentence length: {avg_sentence_length:.1f} words")
+                        
+#                         # Most common words (excluding stopwords)
+#                         filtered_words = [word.lower().strip('.,!?";()[]') for word in words 
+#                                         if len(word) > 3 and word.lower() not in STOPWORDS]
+#                         if filtered_words:
+#                             common_words = Counter(filtered_words).most_common(5)
+#                             st.write("• Most frequent words:")
+#                             for word, count in common_words:
+#                                 st.write(f"  - **{word}**: {count} times")
+                    
+#                     with col2:
+#                         st.write("**🔍 Content Characteristics:**")
+                        
+#                         # Detect content type
+#                         if any(keyword in content.lower() for keyword in ['function', 'variable', 'method', 'class', 'algorithm']):
+#                             st.write("• 💻 **Type**: Technical/Programming content")
+#                         elif any(keyword in content.lower() for keyword in ['research', 'study', 'analysis', 'data', 'results']):
+#                             st.write("• 🔬 **Type**: Research/Academic content")
+#                         elif any(keyword in content.lower() for keyword in ['tutorial', 'how to', 'step', 'guide', 'instructions']):
+#                             st.write("• 📚 **Type**: Educational/Tutorial content")
+#                         else:
+#                             st.write("• 📰 **Type**: General/Article content")
+                        
+#                         # Complexity estimate
+#                         complex_words = [word for word in words if len(word) > 7]
+#                         complexity = len(complex_words) / max(len(words), 1) * 100
+                        
+#                         if complexity > 20:
+#                             st.write("• 🎓 **Complexity**: Advanced")
+#                         elif complexity > 12:
+#                             st.write("• 📖 **Complexity**: Intermediate")
+#                         else:
+#                             st.write("• 📝 **Complexity**: Beginner-friendly")
+                        
+#                         st.write(f"• 📊 **Complexity Score**: {complexity:.1f}%")
+                
+#                 # Enhanced copy and download options
+#                 col4, col5, col6 = st.columns(3)
+#                 with col4:
+#                     copy_button(content, "Copy Full Content", key="url_full")
+#                 with col5:
+#                     st.download_button(
+#                         "💾 Download Summary", 
+#                         summary, 
+#                         "url_summary.txt",
+#                         mime="text/plain",
+#                         key="url_download_summary"
+#                     )
+#                 with col6:
+#                     # Create comprehensive report
+#                     comprehensive_report = f"""
+# URL EXTRACTION REPORT
+# ====================
+
+# SOURCE URL: {url_input}
+# EXTRACTION DATE: Today
+
+# CONTENT SUMMARY:
+# {summary}
+
+# CONTENT METRICS:
+# - Characters: {len(content):,}
+# - Words: {len(words):,}
+# - Lines: {len(content.splitlines()):,}
+# - Sentences: {sentences:,}
+# - Paragraphs: {paragraphs:,}
+# - Estimated Reading Time: ~{reading_time} minute(s)
+
+# FULL EXTRACTED CONTENT:
+# {content}
+# """
+#                     st.download_button(
+#                         "💾 Download Full Report", 
+#                         comprehensive_report, 
+#                         f"url_analysis_report.txt",
+#                         mime="text/plain",
+#                         key="url_download_full"
+#                     )
+
+# # Enhanced Footer
+# st.markdown("---")
+# st.markdown("""
+# <div style="text-align: center; padding: 30px;">
+#     <h3 style="color: rgba(0, 249, 255, 0.8); font-family: 'Orbitron', monospace;">🌌 TECHNOVA AI NEXUS v2.1</h3>
+#     <p style="color: rgba(0, 249, 255, 0.6); font-family: monospace; margin: 10px 0;">
+#         Advanced Neural Processing Suite • Quantum Code Analysis • AI Pattern Detection
+#     </p>
+#     <p style="color: rgba(0, 249, 255, 0.4); font-size: 0.9em;">
+#         Priority-ordered analysis with reliable copy functionality
+#     </p>
+#     <div style="margin-top: 20px; color: rgba(0, 249, 255, 0.3);">
+#         🚀 Built for developers, researchers, and AI enthusiasts
+#     </div>
+# </div>
+# """, unsafe_allow_html=True)
+
+# # Add session state management for better UX
+# if 'analysis_history' not in st.session_state:
+#     st.session_state['analysis_history'] = []
+
+# # Optional: Add a sidebar with tips and shortcuts
+# with st.sidebar:
+#     st.header("⚡ Quick Tips")
+#     st.write("""
+#     **🔧 Code Analyzer:**
+#     • Shows errors & warnings first
+#     • Upload .py files for best results
+#     • Supports GitHub raw URLs
+#     • Detects 12+ code constructs
+    
+#     **🤖 AI Detection:**
+#     • Assessment result shown first
+#     • Analyzes patterns in code/text
+#     • Uses multiple indicators
+#     • Confidence scoring system
+    
+#     **🌐 URL Extractor:**
+#     • Summary appears first
+#     • Works with most websites
+#     • Intelligent content filtering
+#     • Automatic summarization
+    
+#     **📋 Copy Functionality:**
+#     • Click copy button
+#     • Text area appears below
+#     • Select all text (Ctrl+A)
+#     • Copy to clipboard (Ctrl+C)
+#     """)
+    
+#     if st.button("🗑️ Clear All Data", key="clear_all"):
+#         keys_to_remove = []
+#         for key in st.session_state.keys():
+#             if any(prefix in key for prefix in ['text_to_copy_', 'copied_text_', 'copy_btn_', 'copy_area_']):
+#                 keys_to_remove.append(key)
+        
+#         for key in keys_to_remove:
+#             del st.session_state[key]
+        
+#         st.success("All temporary data cleared!")
+#         st.rerun()
+
+
+
+
+
+
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -3655,34 +4890,88 @@ except ImportError:
 
 # Page config
 st.set_page_config(
-    page_title="Technova AI Nexus", 
-    layout="wide", 
+    page_title="Technova AI Nexus",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Simple and reliable copy function using streamlit components
+# Enhanced copy function with proper JavaScript
 def copy_button(text: str, label: str = "Copy", key: str = None):
-    """Simple copy button using streamlit text area"""
+    """Enhanced copy button using JavaScript"""
     if text is None:
         text = ""
     
     button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(text[:50]))}"
-    area_key = f"copy_area_{key}" if key else f"copy_area_{abs(hash(text[:50]))}"
     
-    # Show copy button and text area side by side
-    col1, col2 = st.columns([1, 6])
+    # Create a unique ID for this copy operation
+    unique_id = f"copy_text_{button_key}"
     
-    with col1:
-        st.button(f"📋 {label}", key=button_key, help="Click to show text for copying")
+    # HTML with JavaScript for copy functionality
+    copy_html = f"""
+    <div style="margin: 10px 0;">
+        <button onclick="copyToClipboard_{unique_id}()" 
+                style="background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
+                       border: 1px solid rgba(0, 249, 255, 0.5);
+                       color: #00f9ff;
+                       padding: 8px 16px;
+                       border-radius: 4px;
+                       cursor: pointer;
+                       font-weight: bold;">
+            📋 {label}
+        </button>
+        <span id="copy_status_{unique_id}" style="margin-left: 10px; color: #00f9ff;"></span>
+    </div>
+    <textarea id="{unique_id}" readonly 
+              style="width: 100%; height: 120px; 
+                     background: rgba(0, 20, 40, 0.8);
+                     border: 1px solid rgba(0, 249, 255, 0.3);
+                     color: #00f9ff;
+                     padding: 10px;
+                     border-radius: 4px;">{text}</textarea>
     
-    with col2:
-        st.text_area(
-            "Select all text below and copy (Ctrl+A, Ctrl+C):",
-            value=text,
-            height=120,
-            key=area_key,
-            help="Select all text and copy to clipboard"
-        )
+    <script>
+    function copyToClipboard_{unique_id}() {{
+        const textArea = document.getElementById('{unique_id}');
+        const statusSpan = document.getElementById('copy_status_{unique_id}');
+        
+        textArea.select();
+        textArea.setSelectionRange(0, 99999);
+        
+        try {{
+            document.execCommand('copy');
+            statusSpan.innerHTML = '✅ Copied!';
+            setTimeout(() => {{
+                statusSpan.innerHTML = '';
+            }}, 2000);
+        }} catch (err) {{
+            statusSpan.innerHTML = '❌ Copy failed - please select text manually';
+        }}
+    }}
+    </script>
+    """
+    
+    st.markdown(copy_html, unsafe_allow_html=True)
+
+# Enhanced download function
+def download_button_enhanced(content: str, filename: str, label: str, mime_type: str = "text/plain"):
+    """Enhanced download button"""
+    b64_content = base64.b64encode(content.encode()).decode()
+    href = f'data:{mime_type};base64,{b64_content}'
+    
+    download_html = f"""
+    <a href="{href}" download="{filename}"
+       style="background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
+              border: 1px solid rgba(0, 249, 255, 0.5);
+              color: #00f9ff;
+              padding: 8px 16px;
+              text-decoration: none;
+              border-radius: 4px;
+              font-weight: bold;
+              display: inline-block;">
+        💾 {label}
+    </a>
+    """
+    st.markdown(download_html, unsafe_allow_html=True)
 
 # Simplified styling
 def set_tech_styling():
@@ -3753,13 +5042,13 @@ st.markdown('<p class="subtitle">Advanced AI-Powered Analysis Suite v2.1</p>', u
 
 # Stopwords for summarization
 STOPWORDS = set([
-    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", 
-    "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", 
-    "there", "these", "they", "this", "to", "was", "will", "with", "you", "your", "from", 
-    "our", "we", "he", "she", "his", "her", "its", "were", "been", "being", "than", 
-    "also", "can", "could", "should", "would", "may", "might", "have", "has", "had", 
-    "do", "does", "did", "done", "just", "over", "under", "more", "most", "other", 
-    "some", "any", "each", "many", "few", "those", "them", "which", "who", "whom", 
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into",
+    "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
+    "there", "these", "they", "this", "to", "was", "will", "with", "you", "your", "from",
+    "our", "we", "he", "she", "his", "her", "its", "were", "been", "being", "than",
+    "also", "can", "could", "should", "would", "may", "might", "have", "has", "had",
+    "do", "does", "did", "done", "just", "over", "under", "more", "most", "other",
+    "some", "any", "each", "many", "few", "those", "them", "which", "who", "whom",
     "whose", "where", "when", "why", "how"
 ])
 
@@ -3780,7 +5069,7 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     
     if not sentences:
         return text
-
+    
     # Word frequency analysis
     word_freq = Counter()
     for s in sentences:
@@ -3791,12 +5080,12 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     
     if not word_freq:
         return " ".join(sentences[:max_sentences])
-
+    
     # Normalize frequencies
     max_freq = max(word_freq.values())
     for w in list(word_freq.keys()):
         word_freq[w] /= max_freq
-
+    
     # Score sentences
     scored = []
     for idx, s in enumerate(sentences):
@@ -3805,7 +5094,7 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         length_penalty = 1.0 + 0.2 * max(0, (len(words) - 20) / 20)
         position_boost = 1.1 if idx < 3 else 1.0
         scored.append((score / length_penalty * position_boost, idx, s))
-
+    
     # Select top sentences
     scored.sort(key=lambda x: (-x[0], x[1]))
     top = sorted(scored[:max_sentences], key=lambda x: x[1])
@@ -3814,32 +5103,126 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
         return "\n".join([f"• {s}" for _, _, s in top])
     return " ".join([s for _, _, s in top])
 
+def fix_python_code(code: str) -> dict:
+    """Attempt to fix common Python code issues"""
+    if not code or not code.strip():
+        return {
+            "success": False,
+            "original": code,
+            "fixed": code,
+            "fixes_applied": [],
+            "remaining_errors": ["No code provided"]
+        }
+    
+    fixed_code = code
+    fixes_applied = []
+    remaining_errors = []
+    
+    # Check for syntax errors first
+    try:
+        ast.parse(code)
+        return {
+            "success": True,
+            "original": code,
+            "fixed": code,
+            "fixes_applied": ["Code is already syntactically correct!"],
+            "remaining_errors": []
+        }
+    except SyntaxError as e:
+        remaining_errors.append(f"SyntaxError: {e.msg} at line {e.lineno}")
+    
+    # Common fixes
+    lines = fixed_code.splitlines()
+    new_lines = []
+    
+    for i, line in enumerate(lines):
+        original_line = line
+        
+        # Fix common indentation issues
+        if line and not line.startswith(' ') and not line.startswith('\t'):
+            # Check if this should be indented (after def, class, if, for, while, etc.)
+            if i > 0:
+                prev_line = lines[i-1].strip()
+                if (prev_line.endswith(':') and 
+                    any(prev_line.startswith(keyword) for keyword in ['def ', 'class ', 'if ', 'for ', 'while ', 'try:', 'except', 'else:', 'elif ', 'with '])):
+                    line = '    ' + line
+                    fixes_applied.append(f"Added indentation at line {i+1}")
+        
+        # Fix missing colons
+        stripped = line.strip()
+        if (stripped.startswith(('if ', 'elif ', 'else', 'for ', 'while ', 'def ', 'class ', 'try', 'except', 'finally')) 
+            and not stripped.endswith(':') and not ':' in stripped):
+            line = line.rstrip() + ':'
+            fixes_applied.append(f"Added missing colon at line {i+1}")
+        
+        # Fix common print statement issues
+        print_matches = re.findall(r'print\s+([^(].*)', line)
+        for match in print_matches:
+            if not match.strip().startswith('('):
+                new_line = line.replace(f'print {match}', f'print({match})')
+                if new_line != line:
+                    line = new_line
+                    fixes_applied.append(f"Fixed print statement at line {i+1}")
+        
+        # Fix unclosed strings (basic attempt)
+        quote_count = line.count('"') + line.count("'")
+        if quote_count % 2 != 0 and not line.strip().endswith('\\'):
+            if '"' in line and line.count('"') % 2 != 0:
+                line += '"'
+                fixes_applied.append(f"Added missing quote at line {i+1}")
+            elif "'" in line and line.count("'") % 2 != 0:
+                line += "'"
+                fixes_applied.append(f"Added missing quote at line {i+1}")
+        
+        new_lines.append(line)
+    
+    fixed_code = '\n'.join(new_lines)
+    
+    # Check if fixes worked
+    try:
+        ast.parse(fixed_code)
+        success = True
+    except SyntaxError as e:
+        success = False
+        remaining_errors.append(f"Remaining SyntaxError: {e.msg} at line {e.lineno}")
+    
+    if not fixes_applied:
+        fixes_applied.append("No automatic fixes could be applied to this code.")
+    
+    return {
+        "success": success,
+        "original": code,
+        "fixed": fixed_code,
+        "fixes_applied": fixes_applied,
+        "remaining_errors": remaining_errors
+    }
+
 def analyze_python_enhanced(code: str):
     """Comprehensive Python code analysis with enhanced metrics"""
     report = {
         "basic_stats": {},
-        "functions": [], 
-        "classes": [], 
-        "imports": [], 
+        "functions": [],
+        "classes": [],
+        "imports": [],
         "variables": [],
-        "purpose_summary": "", 
-        "errors": [], 
-        "warnings": [], 
+        "purpose_summary": "",
+        "errors": [],
+        "warnings": [],
         "fixes": [],
         "complexity_metrics": {},
         "code_quality": {},
         "detailed_counts": {},
-        "builtin_functions_used": []  # Initialize this key
+        "builtin_functions_used": []
     }
-
+    
     if not code or not code.strip():
         return report
-
+    
     lines = code.splitlines()
     code_lines = [line for line in lines if line.strip() and not line.strip().startswith("#")]
     comment_lines = [line for line in lines if line.strip().startswith("#")]
     blank_lines = [line for line in lines if not line.strip()]
-
+    
     # Basic statistics
     report["basic_stats"] = {
         "total_lines": len(lines),
@@ -3849,7 +5232,7 @@ def analyze_python_enhanced(code: str):
         "characters": len(code),
         "words": len(code.split())
     }
-
+    
     # Initialize counters
     function_count = 0
     class_count = 0
@@ -3864,7 +5247,7 @@ def analyze_python_enhanced(code: str):
     lambda_count = 0
     list_comp_count = 0
     dict_comp_count = 0
-
+    
     # Pattern-based counting
     for line in code_lines:
         stripped_line = line.strip()
@@ -3887,7 +5270,7 @@ def analyze_python_enhanced(code: str):
         lambda_count += len(re.findall(r'\blambda\b', line))
         list_comp_count += len(re.findall(r'\[.*for.*in.*\]', line))
         dict_comp_count += len(re.findall(r'\{.*for.*in.*\}', line))
-
+    
     report["detailed_counts"] = {
         "functions": def_count,
         "classes": class_count,
@@ -3902,7 +5285,7 @@ def analyze_python_enhanced(code: str):
         "list_comprehensions": list_comp_count,
         "dict_comprehensions": dict_comp_count
     }
-
+    
     # Calculate complexity metrics
     total_constructs = sum([if_count, for_count, while_count, try_count, def_count])
     complexity_score = total_constructs / max(1, len(code_lines)) * 100
@@ -3912,7 +5295,7 @@ def analyze_python_enhanced(code: str):
         "complexity_per_line": round(complexity_score, 2),
         "nesting_level_estimate": max(0, len(re.findall(r'    ', code)) // len(code_lines) * 10) if code_lines else 0
     }
-
+    
     # Code quality metrics
     comment_ratio = len(comment_lines) / max(1, len(lines)) * 100
     avg_line_length = sum(len(line) for line in code_lines) / max(1, len(code_lines))
@@ -3922,7 +5305,7 @@ def analyze_python_enhanced(code: str):
         "avg_line_length": round(avg_line_length, 2),
         "code_to_comment_ratio": round(len(code_lines) / max(1, len(comment_lines)), 2)
     }
-
+    
     # Basic parsing for simple analysis
     for line in code_lines:
         stripped = line.strip()
@@ -3936,10 +5319,10 @@ def analyze_python_enhanced(code: str):
                 report["classes"].append(match.group(1))
         elif stripped.startswith(("import ", "from ")):
             report["imports"].append(stripped)
-
+    
     # Generate purpose summary
     report["purpose_summary"] = summarize_text_advanced(code, max_sentences=3)
-
+    
     # AST analysis for deeper insights
     try:
         tree = ast.parse(code)
@@ -3947,7 +5330,7 @@ def analyze_python_enhanced(code: str):
         report["errors"].append(f"SyntaxError: {e.msg} at line {e.lineno}")
         report["fixes"].append("Check syntax: indentation, colons, parentheses, quotes.")
         return report
-
+    
     # Enhanced AST analysis
     imported_names = set()
     used_names = set()
@@ -3955,24 +5338,24 @@ def analyze_python_enhanced(code: str):
     builtin_functions_used = set()
     
     builtin_funcs = {
-        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate', 
-        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input', 
-        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 
-        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round', 
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate',
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input',
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct',
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round',
         'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
     }
-
+    
     class EnhancedCodeAnalyzer(ast.NodeVisitor):
         def visit_Import(self, node):
             for alias in node.names:
                 imported_names.add(alias.asname or alias.name.split(".")[0])
             self.generic_visit(node)
-
+        
         def visit_ImportFrom(self, node):
             for alias in node.names:
                 imported_names.add(alias.asname or alias.name)
             self.generic_visit(node)
-
+        
         def visit_FunctionDef(self, node):
             assigned_names.add(node.name)
             # Check for mutable default arguments
@@ -3988,11 +5371,11 @@ def analyze_python_enhanced(code: str):
                 report["fixes"].append(f"Consider breaking down '{node.name}' into smaller functions")
             
             self.generic_visit(node)
-
+        
         def visit_ClassDef(self, node):
             assigned_names.add(node.name)
             self.generic_visit(node)
-
+        
         def visit_Name(self, node):
             if isinstance(node.ctx, ast.Load):
                 used_names.add(node.id)
@@ -4002,7 +5385,7 @@ def analyze_python_enhanced(code: str):
                 assigned_names.add(node.id)
                 report["variables"].append(node.id)
             self.generic_visit(node)
-
+        
         def visit_Call(self, node):
             if isinstance(node.func, ast.Name):
                 if node.func.id in {"eval", "exec"}:
@@ -4012,12 +5395,12 @@ def analyze_python_enhanced(code: str):
                     report["warnings"].append("Empty print() statement found")
                     report["fixes"].append("Remove empty print() or add meaningful content")
             self.generic_visit(node)
-
+    
     EnhancedCodeAnalyzer().visit(tree)
-
+    
     # Add builtin functions used to report
     report["builtin_functions_used"] = sorted(list(builtin_functions_used))
-
+    
     # Check for unused imports
     unused_imports = []
     for name in sorted(imported_names):
@@ -4025,13 +5408,13 @@ def analyze_python_enhanced(code: str):
             unused_imports.append(name)
             report["warnings"].append(f"Possibly unused import: '{name}'")
             report["fixes"].append(f"Remove unused import '{name}' if not needed")
-
+    
     # Check for builtin shadowing
     builtins_list = [
-        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate', 
-        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input', 
-        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 
-        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round', 
+        'abs', 'all', 'any', 'bin', 'bool', 'chr', 'dict', 'dir', 'enumerate',
+        'filter', 'float', 'format', 'frozenset', 'hash', 'hex', 'id', 'input',
+        'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'next', 'oct',
+        'open', 'ord', 'pow', 'print', 'range', 'repr', 'reversed', 'round',
         'set', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'zip'
     ]
     
@@ -4041,7 +5424,7 @@ def analyze_python_enhanced(code: str):
             shadowed_builtins.append(name)
             report["warnings"].append(f"Variable '{name}' shadows builtin")
             report["fixes"].append(f"Rename '{name}' to avoid shadowing builtins")
-
+    
     # Code quality analysis
     if report["code_quality"]["comment_ratio"] < 5:
         report["warnings"].append("Low comment density - consider adding more documentation")
@@ -4050,17 +5433,17 @@ def analyze_python_enhanced(code: str):
     if report["code_quality"]["avg_line_length"] > 100:
         report["warnings"].append("Some lines are very long - consider breaking them up")
         report["fixes"].append("Break long lines at logical points (after commas, operators, etc.)")
-
+    
     # Add general recommendations
     if not report["errors"]:
         if not report["warnings"]:
             report["fixes"].append("🎉 Code looks excellent! Consider adding unit tests and type hints.")
         else:
             report["fixes"].append("Review warnings above and apply suggested fixes for better code quality.")
-
+    
     # Remove duplicate variables
     report["variables"] = sorted(list(set(report["variables"])))
-
+    
     return report
 
 def detect_ai_generated_code(code: str) -> dict:
@@ -4124,9 +5507,9 @@ def detect_ai_generated_code(code: str) -> dict:
         reasons.append("Suspiciously perfect code formatting")
     
     return {
-        "score": round(score, 1), 
-        "label": label, 
-        "reasons": reasons, 
+        "score": round(score, 1),
+        "label": label,
+        "reasons": reasons,
         "features": features
     }
 
@@ -4148,7 +5531,7 @@ def fetch_from_url(url: str) -> str:
             return soup.get_text(separator="\n", strip=True)
         else:
             return resp.text
-            
+        
     except requests.exceptions.RequestException as e:
         return f"❌ Error fetching URL: {str(e)}"
     except Exception as e:
@@ -4156,23 +5539,23 @@ def fetch_from_url(url: str) -> str:
 
 # Create tabs
 tabs = st.tabs([
-    "📄 Document Processor", 
+    "📄 Document Processor",
     "🧠 Code Analyzer", 
-    "🤖 AI Detection", 
+    "🔧 Code Corrector",
+    "🤖 AI Detection",
     "🌐 URL Extractor"
 ])
 
 # Tab 1: Document Processor
 with tabs[0]:
     st.header("📄 Neural Document Processor")
-    st.write("*Advanced text analysis and summarization*")
-    
+    st.write("*Advanced text analysis and summarization
     col1, col2 = st.columns([2, 1])
     
     with col1:
         doc_text = st.text_area(
-            "Input Text", 
-            height=200, 
+            "Input Text",
+            height=200,
             placeholder="Paste your document content here...",
             key="doc_text_input"
         )
@@ -4182,7 +5565,7 @@ with tabs[0]:
         doc_url = st.text_input("Document URL", placeholder="https://...", key="doc_url_input")
         doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
         doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
-
+    
     if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
         content = ""
         
@@ -4207,7 +5590,7 @@ with tabs[0]:
                 content = fetch_from_url(doc_url.strip())
         elif doc_text.strip():
             content = doc_text
-
+        
         if not content:
             st.warning("Please provide content via text, file, or URL.")
         elif content.startswith("❌"):
@@ -4229,6 +5612,10 @@ with tabs[0]:
             st.subheader("📋 Copy Summary")
             copy_button(summary, "Copy Summary", key="doc_summary")
             
+            # Download button
+            st.subheader("💾 Download Summary")
+            download_button_enhanced(summary, "summary.txt", "Download Summary")
+            
             # Then show document metrics
             st.subheader("📊 Document Statistics")
             col1, col2, col3, col4 = st.columns(4)
@@ -4240,17 +5627,8 @@ with tabs[0]:
                 st.metric("Lines", f"{len(content.splitlines()):,}")
             with col4:
                 st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
-            
-            # Download option
-            st.download_button(
-                "💾 Download Summary", 
-                summary, 
-                "summary.txt",
-                mime="text/plain",
-                key="doc_download_btn"
-            )
 
-# Tab 2: Enhanced Code Analyzer with reordered sections
+# Tab 2: Enhanced Code Analyzer (removed URL input)
 with tabs[1]:
     st.header("🧠 Quantum Code Analyzer")
     st.write("*Deep code analysis with comprehensive metrics and optimization recommendations*")
@@ -4259,40 +5637,34 @@ with tabs[1]:
     
     with col1:
         code_text = st.text_area(
-            "Python Code", 
-            height=250, 
+            "Python Code",
+            height=250,
             placeholder="Paste your Python code here...",
             key="code_text_input"
         )
     
     with col2:
         code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
-        code_url = st.text_input("Code URL", placeholder="https://...", key="code_url_input")
-
+    
     if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
         code_content = ""
         
         if code_file:
             code_content = code_file.read().decode("utf-8", errors="ignore")
-        elif code_url.strip():
-            with st.spinner("Fetching code..."):
-                code_content = fetch_from_url(code_url.strip())
         elif code_text.strip():
             code_content = code_text
-
+        
         if not code_content:
-            st.warning("Please provide code via input, file, or URL.")
-        elif code_content.startswith("❌"):
-            st.error(code_content)
+            st.warning("Please provide code via input or file.")
         else:
             with st.expander("Code Preview", expanded=False):
                 st.code(code_content, language="python")
-
+            
             with st.spinner("Analyzing code..."):
                 report = analyze_python_enhanced(code_content)
-
+            
             st.success("🎉 Analysis Complete!")
-
+            
             # PRIORITY SECTION 1: ERRORS (Most Important)
             st.header("❌ Errors")
             if report["errors"]:
@@ -4320,8 +5692,7 @@ with tabs[1]:
             
             # Copy functionality for main analysis
             st.header("📋 Copy Analysis Report")
-            formatted_report = f"""
-CODE ANALYSIS REPORT
+            formatted_report = f"""CODE ANALYSIS REPORT
 ==================
 
 ERRORS ({len(report['errors'])} found):
@@ -4352,9 +5723,13 @@ DETAILED STATISTICS:
 - Print Statements: {report['detailed_counts'].get('print_statements', 0)}
 - If Statements: {report['detailed_counts'].get('if_statements', 0)}
 - For Loops: {report['detailed_counts'].get('for_loops', 0)}
-- While Loops: {report['detailed_counts'].get('while_loops', 0)}
-"""
+- While Loops: {report['detailed_counts'].get('while_loops', 0)}"""
+
             copy_button(formatted_report, "Copy Full Report", key="code_report")
+            
+            # Download button for report
+            st.subheader("💾 Download Report")
+            download_button_enhanced(formatted_report, "code_analysis_report.txt", "Download Report")
             
             # NOW SHOW DETAILED METRICS (Lower Priority)
             st.header("📊 Detailed Code Metrics")
@@ -4370,7 +5745,7 @@ DETAILED STATISTICS:
                     if len(report["functions"]) > 10:
                         st.write(f"... and {len(report['functions']) - 10} more")
                 
-                # SAFE ACCESS TO builtin_functions_used - FIXED LINE
+                # SAFE ACCESS TO builtin_functions_used
                 builtin_functions = report.get("builtin_functions_used", [])
                 if builtin_functions:
                     st.subheader("🐍 Built-in Functions Used")
@@ -4391,7 +5766,7 @@ DETAILED STATISTICS:
                     st.write(variables_display)
                     if len(report["variables"]) > 20:
                         st.write(f"... and {len(report['variables']) - 20} more variables")
-
+            
             # Basic Statistics Section
             st.subheader("📈 Line Statistics")
             col1, col2, col3, col4 = st.columns(4)
@@ -4408,7 +5783,7 @@ DETAILED STATISTICS:
             with col4:
                 st.metric("Characters", f"{report['basic_stats'].get('characters', 0):,}")
                 st.metric("Print Statements", report["detailed_counts"].get("print_statements", 0))
-
+            
             # Detailed Counts Section
             st.subheader("🔧 Code Constructs")
             col1, col2, col3, col4 = st.columns(4)
@@ -4425,7 +5800,7 @@ DETAILED STATISTICS:
             with col4:
                 st.metric("List Comprehensions", report["detailed_counts"].get("list_comprehensions", 0))
                 st.metric("Dict Comprehensions", report["detailed_counts"].get("dict_comprehensions", 0))
-
+            
             # Code Quality Metrics
             st.subheader("📊 Quality Metrics")
             col1, col2, col3 = st.columns(3)
@@ -4433,15 +5808,15 @@ DETAILED STATISTICS:
             with col1:
                 comment_ratio = report["code_quality"].get("comment_ratio", 0)
                 st.metric("Comment Ratio", f"{comment_ratio:.1f}%")
-                
+            
             with col2:
                 avg_line_length = report["code_quality"].get("avg_line_length", 0)
                 st.metric("Avg Line Length", f"{avg_line_length:.1f} chars")
-                
+            
             with col3:
                 complexity = report["complexity_metrics"].get("cyclomatic_complexity_estimate", 0)
                 st.metric("Complexity Score", complexity)
-
+            
             # Imports and Variables Details
             with st.expander("📦 Imports & Variables Details", expanded=False):
                 col1, col2 = st.columns(2)
@@ -4457,417 +5832,240 @@ DETAILED STATISTICS:
                 with col2:
                     if report["variables"]:
                         st.subheader("📝 All Variables")
-                        variables_display = ", ".join(f"`{var}`" for var in report["variables"])
-                        st.write(variables_display)
-                    else:
-                        st.write("No variables detected")
-            
-            # Download option
-            st.download_button(
-                "💾 Download Full Report", 
-                formatted_report, 
-                "code_analysis_report.txt",
-                mime="text/plain",
-                key="code_download_btn"
-            )
+                        st.write(", ".join(f"`{var}`" for var in report["variables"]))
 
-# Tab 3: AI Detection with reordered sections
+# Tab 3: NEW Code Corrector
 with tabs[2]:
-    st.header("🤖 AI Detection Matrix")
-    st.write("*Advanced pattern recognition for AI-generated content*")
+    st.header("🔧 AI Code Corrector")
+    st.write("*Automatically fix common Python syntax errors and issues*")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        ai_text = st.text_area(
-            "Content for Analysis", 
-            height=200, 
-            placeholder="Paste text or code to analyze for AI patterns...",
-            key="ai_text_input"
+        wrong_code = st.text_area(
+            "Problematic Python Code",
+            height=250,
+            placeholder="Paste your buggy or incorrect Python code here...",
+            key="wrong_code_input"
         )
     
     with col2:
-        ai_file = st.file_uploader("Upload File", type=["txt", "py", "md"], key="ai_file_upload")
-        ai_url = st.text_input("Content URL", placeholder="https://...", key="ai_url_input")
-
-    if st.button("🔬 Scan for AI Patterns", type="primary", key="ai_analyze_btn"):
-        content = ""
+        wrong_code_file = st.file_uploader("Upload Buggy Python File", type=["py"], key="wrong_code_file")
         
-        if ai_file:
-            content = ai_file.read().decode("utf-8", errors="ignore")
-        elif ai_url.strip():
-            with st.spinner("Fetching content..."):
-                content = fetch_from_url(ai_url.strip())
-        elif ai_text.strip():
-            content = ai_text
-
-        if not content:
-            st.warning("Please provide content for analysis.")
-        elif content.startswith("❌"):
-            st.error(content)
+        st.info("🔧 **Auto-Fix Features:**\n"
+                "• Missing colons\n"
+                "• Indentation issues\n" 
+                "• Print statement syntax\n"
+                "• Unclosed quotes\n"
+                "• Common syntax errors")
+    
+    if st.button("🛠️ Fix Code", type="primary", key="fix_code_btn"):
+        code_to_fix = ""
+        
+        if wrong_code_file:
+            code_to_fix = wrong_code_file.read().decode("utf-8", errors="ignore")
+        elif wrong_code.strip():
+            code_to_fix = wrong_code
+        
+        if not code_to_fix:
+            st.warning("Please provide code to fix via input or file.")
         else:
-            with st.spinner("Analyzing patterns..."):
-                result = detect_ai_generated_code(content)
+            with st.spinner("🔧 Applying fixes..."):
+                fix_result = fix_python_code(code_to_fix)
             
-            st.success("🔍 Analysis Complete!")
-            
-            # PRIORITY 1: MAIN ASSESSMENT (Most Important)
-            score_val = result['score']
-            if score_val < 45:
-                color = "#00ff00"
-                interpretation = "Human-like patterns detected"
-            elif score_val < 65:
-                color = "#ffaa00"
-                interpretation = "Mixed or uncertain patterns"
+            if fix_result["success"]:
+                st.success("✅ Code successfully fixed!")
             else:
-                color = "#ff4444"
-                interpretation = "AI-like patterns detected"
+                st.warning("⚠️ Partial fixes applied - some errors may remain")
             
-            st.header(f"🎯 AI Detection Result: {result['label']}")
+            # Show fixes applied
+            st.subheader("🛠️ Fixes Applied")
+            for fix in fix_result["fixes_applied"]:
+                st.info(fix)
             
-            # Visual score indicator
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.metric(
-                    "AI Likelihood Score", 
-                    f"{score_val}%",
-                    delta=f"{score_val - 50:+.1f}% vs baseline",
-                    delta_color="inverse"
-                )
-                
-                # Progress bar for visual representation
-                st.markdown(f"""
-                <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 5px; margin: 10px 0;">
-                    <div style="background: {color}; height: 20px; width: {score_val}%; border-radius: 8px; transition: all 0.3s;"></div>
-                </div>
-                <p style="text-align: center; color: {color}; font-weight: bold;">{interpretation}</p>
-                """, unsafe_allow_html=True)
+            # Show remaining errors if any
+            if fix_result["remaining_errors"]:
+                st.subheader("❌ Remaining Issues")
+                for error in fix_result["remaining_errors"]:
+                    st.error(error)
             
-            # PRIORITY 2: KEY INDICATORS
-            st.header("🔍 Key Indicators")
-            if result["reasons"]:
-                for i, reason in enumerate(result["reasons"], 1):
-                    st.warning(f"{i}. {reason}")
-            else:
-                st.success("✅ No significant AI patterns detected")
-            
-            # PRIORITY 3: COPY FUNCTIONALITY
-            st.header("📋 Copy Detection Report")
-            detection_report = f"""
-AI DETECTION ANALYSIS REPORT
-============================
-
-OVERALL ASSESSMENT: {result['label']}
-CONFIDENCE SCORE: {result['score']}%
-INTERPRETATION: {interpretation}
-
-KEY INDICATORS:
-{chr(10).join(f"- {reason}" for reason in result['reasons']) if result['reasons'] else "- No significant patterns detected"}
-
-DETAILED FEATURE ANALYSIS:
-{chr(10).join(f"- {k.replace('_', ' ').title()}: {v:.3f}" for k, v in result['features'].items())}
-
-CONFIDENCE BREAKDOWN:
-- Comment Pattern Score: {abs(result['features'].get('comment_density', 0) - 0.15) / 0.15:.2f}
-- Code Repetition Score: {result['features'].get('repeated_line_ratio', 0):.2f}
-- Generic Names Score: {result['features'].get('generic_name_density', 0):.2f}
-- Perfect Format Score: {result['features'].get('perfect_formatting', 0):.2f}
-"""
-            copy_button(detection_report, "Copy Detection Report", key="ai_report")
-            
-            # LOWER PRIORITY: DETAILED METRICS
-            st.header("📊 Detailed Feature Analysis")
-            
+            # Show before/after comparison
             col1, col2 = st.columns(2)
             
             with col1:
-                st.write("**📈 Pattern Metrics:**")
-                for feature, value in result["features"].items():
-                    feature_name = feature.replace("_", " ").title()
-                    
-                    # Color code based on feature values
-                    if "density" in feature or "ratio" in feature:
-                        if value > 0.3:
-                            color_indicator = "🔴"
-                        elif value > 0.15:
-                            color_indicator = "🟡"
-                        else:
-                            color_indicator = "🟢"
-                    else:
-                        color_indicator = "🔵"
-                    
-                    st.write(f"{color_indicator} **{feature_name}:** `{value:.3f}`")
+                st.subheader("📝 Original Code")
+                st.code(fix_result["original"], language="python")
             
             with col2:
-                st.write("**🎯 Confidence Breakdown:**")
-                
-                # Create confidence indicators for each feature
-                features = result["features"]
-                
-                if "comment_density" in features:
-                    cd_score = abs(features["comment_density"] - 0.15) / 0.15
-                    st.write(f"📝 Comment Pattern: `{cd_score:.2f}` {'⚠️' if cd_score > 0.5 else '✅'}")
-                
-                if "repeated_line_ratio" in features:
-                    rr_score = features["repeated_line_ratio"]
-                    st.write(f"🔄 Code Repetition: `{rr_score:.2f}` {'⚠️' if rr_score > 0.1 else '✅'}")
-                
-                if "generic_name_density" in features:
-                    gn_score = features["generic_name_density"]
-                    st.write(f"🏷️ Generic Names: `{gn_score:.2f}` {'⚠️' if gn_score > 0.03 else '✅'}")
-                
-                if "perfect_formatting" in features:
-                    pf_score = features["perfect_formatting"]
-                    st.write(f"✨ Perfect Format: `{pf_score:.2f}` {'⚠️' if pf_score > 0.5 else '✅'}")
+                st.subheader("✨ Fixed Code")
+                st.code(fix_result["fixed"], language="python")
             
-            # Download option
-            st.download_button(
-                "💾 Download Analysis", 
-                detection_report, 
-                "ai_detection_report.txt",
-                mime="text/plain",
-                key="ai_download_btn"
-            )
+            # Copy and download functionality
+            st.subheader("📋 Copy Fixed Code")
+            copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
+            
+            st.subheader("💾 Download Fixed Code")
+            download_button_enhanced(fix_result["fixed"], "fixed_code.py", "Download Fixed Code", "text/x-python")
 
-# Tab 4: URL Extractor with reordered sections
+# Tab 4: AI Detection (removed URL input)
 with tabs[3]:
-    st.header("🌐 URL Data Extraction Engine")
-    st.write("*Advanced web content extraction and intelligent analysis*")
+    st.header("🤖 Neural AI Detection")
+    st.write("*Advanced analysis to detect AI-generated code patterns*")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        url_input = st.text_input(
-            "🎯 Target URL", 
-            placeholder="Enter any URL for intelligent content extraction...",
-            key="url_input_field",
-            help="Supports web pages, GitHub files, documentation, articles, and more"
+        ai_code_text = st.text_area(
+            "Code to Analyze",
+            height=250,
+            placeholder="Paste code to check for AI generation patterns...",
+            key="ai_code_input"
         )
     
     with col2:
-        url_length = st.slider("Summary Length", 1, 15, 7, key="url_summary_length")
-        url_bullets = st.checkbox("Use Bullet Points", value=True, key="url_use_bullets")
-        url_show_preview = st.checkbox("Show Content Preview", value=True, key="url_show_preview")
-
-    if st.button("🚀 Extract & Analyze", type="primary", key="url_analyze_btn"):
-        if not url_input.strip():
-            st.warning("⚠️ Please enter a valid URL to proceed.")
+        ai_code_file = st.file_uploader("Upload Code File", type=["py"], key="ai_code_file")
+        
+        st.info("🔍 **Detection Features:**\n"
+                "• Comment density analysis\n"
+                "• Generic naming patterns\n"
+                "• Code repetition metrics\n"
+                "• Formatting perfectness\n"
+                "• Statistical anomalies")
+    
+    if st.button("🔍 Detect AI Patterns", type="primary", key="ai_detect_btn"):
+        ai_content = ""
+        
+        if ai_code_file:
+            ai_content = ai_code_file.read().decode("utf-8", errors="ignore")
+        elif ai_code_text.strip():
+            ai_content = ai_code_text
+        
+        if not ai_content:
+            st.warning("Please provide code via input or file.")
         else:
-            with st.spinner("🔄 Extracting content from URL..."):
+            with st.spinner("Running AI detection..."):
+                ai_result = detect_ai_generated_code(ai_content)
+            
+            # Show results
+            st.subheader("🎯 Detection Results")
+            
+            # Main result with colored background
+            score = ai_result["score"]
+            if score >= 70:
+                st.error(f"**{ai_result['label']}** (Score: {score}%)")
+            elif score >= 45:
+                st.warning(f"**{ai_result['label']}** (Score: {score}%)")
+            else:
+                st.success(f"**{ai_result['label']}** (Score: {score}%)")
+            
+            # Show reasons
+            if ai_result["reasons"]:
+                st.subheader("📊 Analysis Details")
+                for reason in ai_result["reasons"]:
+                    st.write(f"• {reason}")
+            
+            # Technical metrics
+            with st.expander("🔬 Technical Metrics", expanded=False):
+                features = ai_result["features"]
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Comment Density", f"{features.get('comment_density', 0):.3f}")
+                    st.metric("Generic Names", f"{features.get('generic_name_density', 0):.3f}")
+                
+                with col2:
+                    st.metric("Repeated Lines", f"{features.get('repeated_line_ratio', 0):.3f}")
+                    st.metric("Perfect Format", f"{features.get('perfect_formatting', 0):.1f}")
+            
+            # Copy functionality
+            ai_report = f"""AI DETECTION REPORT
+===================
+
+Result: {ai_result['label']} (Score: {ai_result['score']}%)
+
+Reasons:
+{chr(10).join(f"- {reason}" for reason in ai_result['reasons']) if ai_result['reasons'] else "No specific indicators found"}
+
+Technical Metrics:
+- Comment Density: {ai_result['features'].get('comment_density', 0):.3f}
+- Generic Name Density: {ai_result['features'].get('generic_name_density', 0):.3f}  
+- Repeated Line Ratio: {ai_result['features'].get('repeated_line_ratio', 0):.3f}
+- Perfect Formatting: {ai_result['features'].get('perfect_formatting', 0):.1f}"""
+
+            st.subheader("📋 Copy Detection Report")
+            copy_button(ai_report, "Copy AI Report", key="ai_detection_report")
+            
+            st.subheader("💾 Download Report")
+            download_button_enhanced(ai_report, "ai_detection_report.txt", "Download AI Report")
+
+# Tab 5: URL Extractor
+with tabs[4]:
+    st.header("🌐 Web Content Extractor")
+    st.write("*Extract and analyze content from web pages*")
+    
+    url_input = st.text_input("Enter URL", placeholder="https://example.com", key="url_extractor_input")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        extract_mode = st.selectbox("Extraction Mode", ["Text Only", "Text + Analysis"], key="extract_mode")
+    with col2:
+        max_chars = st.slider("Max Characters", 1000, 50000, 10000, key="max_chars")
+    
+    if st.button("🌐 Extract Content", type="primary", key="extract_btn"):
+        if not url_input.strip():
+            st.warning("Please enter a URL.")
+        else:
+            with st.spinner("Fetching content..."):
                 content = fetch_from_url(url_input.strip())
             
             if content.startswith("❌"):
                 st.error(content)
             else:
-                st.success("✅ Content extracted successfully!")
+                # Truncate if too long
+                if len(content) > max_chars:
+                    content = content[:max_chars] + "\n\n[Content truncated...]"
                 
-                # Generate enhanced summary
-                with st.spinner("🧠 Generating intelligent summary..."):
-                    summary = summarize_text_advanced(content, url_length, url_bullets)
+                st.success("Content extracted successfully!")
                 
-                # PRIORITY 1: SUMMARY (Most Important)
-                st.header("🎯 Intelligent Content Summary")
-                if url_bullets:
-                    st.markdown(summary)
-                else:
-                    st.write(summary)
+                # Show content
+                st.subheader("📄 Extracted Content")
+                st.text_area("Content", content, height=300, key="extracted_content_display")
                 
-                # PRIORITY 2: COPY FUNCTIONALITY
-                st.header("📋 Copy Summary")
-                copy_button(summary, "Copy Summary", key="url_summary")
-                
-                # Enhanced metrics display (LOWER PRIORITY)
-                words = content.split()
-                sentences = len(re.findall(r'[.!?]+', content))
-                paragraphs = len([p for p in content.split('\n\n') if p.strip()])
-                
-                # Reading time estimation
-                avg_reading_speed = 200  # words per minute
-                reading_time = max(1, len(words) // avg_reading_speed)
-                st.info(f"📚 Estimated reading time: ~{reading_time} minute{'s' if reading_time != 1 else ''}")
-                
-                st.header("📊 Content Statistics")
-                col1, col2, col3, col4, col5 = st.columns(5)
-                with col1:
-                    st.metric("📄 Characters", f"{len(content):,}")
-                with col2:
-                    st.metric("📝 Words", f"{len(words):,}")
-                with col3:
-                    st.metric("📋 Lines", f"{len(content.splitlines()):,}")
-                with col4:
-                    st.metric("📖 Sentences", f"{sentences:,}")
-                with col5:
-                    st.metric("📑 Paragraphs", f"{paragraphs:,}")
-                
-                # Content preview with better formatting
-                if url_show_preview:
-                    with st.expander("📄 Content Preview", expanded=False):
-                        preview_length = 3000
-                        preview = content[:preview_length]
-                        if len(content) > preview_length:
-                            preview += f"\n\n... [Content truncated - showing first {preview_length:,} characters of {len(content):,} total]"
-                        
-                        # Try to detect if it's code
-                        if any(keyword in content.lower()[:500] for keyword in ['def ', 'class ', 'import ', 'function', '#include', 'public class']):
-                            st.code(preview, language="python" if "def " in preview or "import " in preview else "text")
-                        else:
-                            st.text(preview)
-                
-                # Additional analysis
-                with st.expander("📊 Content Analysis", expanded=False):
-                    col1, col2 = st.columns(2)
+                # Analysis if requested
+                if extract_mode == "Text + Analysis":
+                    with st.spinner("Analyzing content..."):
+                        summary = summarize_text_advanced(content, max_sentences=5)
                     
+                    st.subheader("📊 Content Analysis")
+                    col1, col2, col3, col4 = st.columns(4)
                     with col1:
-                        st.write("**📈 Content Statistics:**")
-                        avg_word_length = sum(len(word) for word in words) / max(len(words), 1)
-                        st.write(f"• Average word length: {avg_word_length:.1f} characters")
-                        
-                        if sentences > 0:
-                            avg_sentence_length = len(words) / sentences
-                            st.write(f"• Average sentence length: {avg_sentence_length:.1f} words")
-                        
-                        # Most common words (excluding stopwords)
-                        filtered_words = [word.lower().strip('.,!?";()[]') for word in words 
-                                        if len(word) > 3 and word.lower() not in STOPWORDS]
-                        if filtered_words:
-                            common_words = Counter(filtered_words).most_common(5)
-                            st.write("• Most frequent words:")
-                            for word, count in common_words:
-                                st.write(f"  - **{word}**: {count} times")
-                    
+                        st.metric("Characters", f"{len(content):,}")
                     with col2:
-                        st.write("**🔍 Content Characteristics:**")
-                        
-                        # Detect content type
-                        if any(keyword in content.lower() for keyword in ['function', 'variable', 'method', 'class', 'algorithm']):
-                            st.write("• 💻 **Type**: Technical/Programming content")
-                        elif any(keyword in content.lower() for keyword in ['research', 'study', 'analysis', 'data', 'results']):
-                            st.write("• 🔬 **Type**: Research/Academic content")
-                        elif any(keyword in content.lower() for keyword in ['tutorial', 'how to', 'step', 'guide', 'instructions']):
-                            st.write("• 📚 **Type**: Educational/Tutorial content")
-                        else:
-                            st.write("• 📰 **Type**: General/Article content")
-                        
-                        # Complexity estimate
-                        complex_words = [word for word in words if len(word) > 7]
-                        complexity = len(complex_words) / max(len(words), 1) * 100
-                        
-                        if complexity > 20:
-                            st.write("• 🎓 **Complexity**: Advanced")
-                        elif complexity > 12:
-                            st.write("• 📖 **Complexity**: Intermediate")
-                        else:
-                            st.write("• 📝 **Complexity**: Beginner-friendly")
-                        
-                        st.write(f"• 📊 **Complexity Score**: {complexity:.1f}%")
+                        st.metric("Words", f"{len(content.split()):,}")
+                    with col3:
+                        st.metric("Lines", f"{len(content.splitlines()):,}")
+                    with col4:
+                        st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
+                    
+                    st.subheader("📋 Auto Summary")
+                    st.write(summary)
+                    
+                    # Copy summary
+                    copy_button(summary, "Copy Summary", key="url_summary")
                 
-                # Enhanced copy and download options
-                col4, col5, col6 = st.columns(3)
-                with col4:
-                    copy_button(content, "Copy Full Content", key="url_full")
-                with col5:
-                    st.download_button(
-                        "💾 Download Summary", 
-                        summary, 
-                        "url_summary.txt",
-                        mime="text/plain",
-                        key="url_download_summary"
-                    )
-                with col6:
-                    # Create comprehensive report
-                    comprehensive_report = f"""
-URL EXTRACTION REPORT
-====================
+                # Copy full content
+                st.subheader("📋 Copy Content")
+                copy_button(content, "Copy Full Content", key="url_content")
+                
+                # Download content
+                st.subheader("💾 Download Content")
+                download_button_enhanced(content, "extracted_content.txt", "Download Content")
 
-SOURCE URL: {url_input}
-EXTRACTION DATE: Today
-
-CONTENT SUMMARY:
-{summary}
-
-CONTENT METRICS:
-- Characters: {len(content):,}
-- Words: {len(words):,}
-- Lines: {len(content.splitlines()):,}
-- Sentences: {sentences:,}
-- Paragraphs: {paragraphs:,}
-- Estimated Reading Time: ~{reading_time} minute(s)
-
-FULL EXTRACTED CONTENT:
-{content}
-"""
-                    st.download_button(
-                        "💾 Download Full Report", 
-                        comprehensive_report, 
-                        f"url_analysis_report.txt",
-                        mime="text/plain",
-                        key="url_download_full"
-                    )
-
-# Enhanced Footer
+# Footer
 st.markdown("---")
-st.markdown("""
-<div style="text-align: center; padding: 30px;">
-    <h3 style="color: rgba(0, 249, 255, 0.8); font-family: 'Orbitron', monospace;">🌌 TECHNOVA AI NEXUS v2.1</h3>
-    <p style="color: rgba(0, 249, 255, 0.6); font-family: monospace; margin: 10px 0;">
-        Advanced Neural Processing Suite • Quantum Code Analysis • AI Pattern Detection
-    </p>
-    <p style="color: rgba(0, 249, 255, 0.4); font-size: 0.9em;">
-        Priority-ordered analysis with reliable copy functionality
-    </p>
-    <div style="margin-top: 20px; color: rgba(0, 249, 255, 0.3);">
-        🚀 Built for developers, researchers, and AI enthusiasts
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# Add session state management for better UX
-if 'analysis_history' not in st.session_state:
-    st.session_state['analysis_history'] = []
-
-# Optional: Add a sidebar with tips and shortcuts
-with st.sidebar:
-    st.header("⚡ Quick Tips")
-    st.write("""
-    **🔧 Code Analyzer:**
-    • Shows errors & warnings first
-    • Upload .py files for best results
-    • Supports GitHub raw URLs
-    • Detects 12+ code constructs
-    
-    **🤖 AI Detection:**
-    • Assessment result shown first
-    • Analyzes patterns in code/text
-    • Uses multiple indicators
-    • Confidence scoring system
-    
-    **🌐 URL Extractor:**
-    • Summary appears first
-    • Works with most websites
-    • Intelligent content filtering
-    • Automatic summarization
-    
-    **📋 Copy Functionality:**
-    • Click copy button
-    • Text area appears below
-    • Select all text (Ctrl+A)
-    • Copy to clipboard (Ctrl+C)
-    """)
-    
-    if st.button("🗑️ Clear All Data", key="clear_all"):
-        keys_to_remove = []
-        for key in st.session_state.keys():
-            if any(prefix in key for prefix in ['text_to_copy_', 'copied_text_', 'copy_btn_', 'copy_area_']):
-                keys_to_remove.append(key)
-        
-        for key in keys_to_remove:
-            del st.session_state[key]
-        
-        st.success("All temporary data cleared!")
-        st.rerun()
-
-
-
-
-
-
+st.markdown(
+    '<div style="text-align: center; color: rgba(0, 249, 255, 0.6); margin: 2rem 0;">'
+    '🌌 TECHNOVA AI NEXUS v2.1 | Powered by Advanced Neural Networks 🚀'
+    '</div>', 
+    unsafe_allow_html=True
+)
