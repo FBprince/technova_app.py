@@ -4874,7 +4874,6 @@
 
 
 
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -5193,7 +5192,7 @@ def fix_python_code(code: str) -> dict:
             
             # 3. Fix print statements (Python 3 style)
             # Handle: print "hello" -> print("hello")
-            print_pattern = r'\bprint\s+([^(][^#]*?)(?:#.*)?'
+            print_pattern = r'\bprint\s+([^(][^#]*?)(?:#.*)?$'
             match = re.search(print_pattern, line)
             if match:
                 print_content = match.group(1).strip()
@@ -5245,6 +5244,32 @@ def fix_python_code(code: str) -> dict:
                         new_lines.insert(0, "import math")
                         fixes_applied.append("Added missing 'import math' statement")
                         made_changes = True
+            
+            # 8. Fix incorrect variable assignments
+            # Handle cases like: x + 1 (missing assignment)
+            if (re.match(r'^\s*[a-zA-Z_]\w*\s*[+\-*/]\s*\w+\s*$', line.strip()) and 
+                not any(op in line for op in ['=', '+=', '-=', '*=', '/='])):
+                var_name = re.match(r'^\s*([a-zA-Z_]\w*)', line.strip()).group(1)
+                line = re.sub(r'(\s*)([a-zA-Z_]\w*\s*[+\-*/]\s*\w+)', r'\1\2  # Possible missing assignment?', line)
+                fixes_applied.append(f"Flagged possible missing assignment at line {i+1}")
+                made_changes = True
+            
+            # 9. Fix function definition issues
+            if stripped.startswith('def ') and '(' not in stripped:
+                # Add empty parentheses: def func -> def func()
+                func_match = re.match(r'(\s*def\s+\w+)', line)
+                if func_match:
+                    line = line.replace(func_match.group(1), func_match.group(1) + '()')
+                    fixes_applied.append(f"Added parentheses to function definition at line {i+1}")
+                    made_changes = True
+            
+            # 10. Fix range() usage
+            # for i in 10: -> for i in range(10):
+            range_pattern = r'(\bfor\s+\w+\s+in\s+)(\d+)(\s*:)'
+            if re.search(range_pattern, line):
+                line = re.sub(range_pattern, r'\1range(\2)\3', line)
+                fixes_applied.append(f"Fixed range usage in for loop at line {i+1}")
+                made_changes = True
             
             new_lines.append(line)
         
@@ -5403,7 +5428,7 @@ def analyze_python_enhanced(code: str):
     report["complexity_metrics"] = {
         "cyclomatic_complexity_estimate": total_constructs + 1,
         "complexity_per_line": round(complexity_score, 2),
-        "nesting_level_estimate": max(0, len(re.findall(r'    ', code)) / len(code_lines) * 10) if code_lines else 0
+        "nesting_level_estimate": max(0, len(re.findall(r'    ', code)) // len(code_lines) * 10) if code_lines else 0
     }
     
     # Code quality metrics
@@ -5547,7 +5572,7 @@ def analyze_python_enhanced(code: str):
     # Add general recommendations
     if not report["errors"]:
         if not report["warnings"]:
-            report["fixes"].append("🎉 Code looks excellent! Consider adding unit tests and type hints.")
+            report["fixes"].append("Code looks excellent! Consider adding unit tests and type hints.")
         else:
             report["fixes"].append("Review warnings above and apply suggested fixes for better code quality.")
     
@@ -5559,7 +5584,7 @@ def analyze_python_enhanced(code: str):
 def detect_ai_generated_code(code: str) -> dict:
     """Detect if code might be AI-generated based on patterns"""
     if not code or not code.strip():
-        return {"score": 0, "label": "❓ No content", "reasons": [], "features": {}}
+        return {"score": 0, "label": "No content", "reasons": [], "features": {}}
     
     lines = code.splitlines()
     code_lines = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
@@ -5599,11 +5624,11 @@ def detect_ai_generated_code(code: str) -> dict:
     
     # Determine label
     if score >= 70:
-        label = "🚨 Likely AI-generated"
+        label = "Likely AI-generated"
     elif score >= 45:
-        label = "🤔 Unclear/Mixed"
+        label = "Unclear/Mixed"
     else:
-        label = "✅ Likely human-written"
+        label = "Likely human-written"
     
     # Generate reasons
     reasons = []
@@ -5643,23 +5668,23 @@ def fetch_from_url(url: str) -> str:
             return resp.text
         
     except requests.exceptions.RequestException as e:
-        return f"❌ Error fetching URL: {str(e)}"
+        return f"Error fetching URL: {str(e)}"
     except Exception as e:
-        return f"❌ Error processing content: {str(e)}"
+        return f"Error processing content: {str(e)}"
 
 # Create tabs
 tabs = st.tabs([
-    "📄 Document Processor",
-    "🧠 Code Analyzer", 
-    "🔧 Code Corrector",
-    "🤖 AI Detection",
-    "🌐 URL Extractor"
+    "Document Processor",
+    "Code Analyzer", 
+    "Code Corrector",
+    "AI Detection",
+    "URL Extractor"
 ])
 
 # Tab 1: Document Processor
 with tabs[0]:
-    st.header("📄 Neural Document Processor")
-    st.write("*Advanced text analysis and summarization*")
+    st.header("Neural Document Processor")
+    st.write("Advanced text analysis and summarization")
     
     col1, col2 = st.columns([2, 1])
     
@@ -5677,7 +5702,7 @@ with tabs[0]:
         doc_length = st.slider("Summary Length", 1, 10, 5, key="doc_summary_length")
         doc_bullets = st.checkbox("Use Bullets", value=False, key="doc_use_bullets")
     
-    if st.button("🚀 Analyze Document", type="primary", key="doc_analyze_btn"):
+    if st.button("Analyze Document", type="primary", key="doc_analyze_btn"):
         content = ""
         
         # Get content from various sources
@@ -5704,7 +5729,7 @@ with tabs[0]:
         
         if not content:
             st.warning("Please provide content via text, file, or URL.")
-        elif content.startswith("❌"):
+        elif content.startswith("Error"):
             st.error(content)
         else:
             with st.spinner("Processing..."):
@@ -5713,22 +5738,22 @@ with tabs[0]:
             st.success("Analysis Complete!")
             
             # Show summary FIRST (most important)
-            st.subheader("📋 Generated Summary")
+            st.subheader("Generated Summary")
             if doc_bullets:
                 st.markdown(summary)
             else:
                 st.write(summary)
             
             # Copy functionality for summary
-            st.subheader("📋 Copy Summary")
+            st.subheader("Copy Summary")
             copy_button(summary, "Copy Summary", key="doc_summary")
             
             # Download button
-            st.subheader("💾 Download Summary")
+            st.subheader("Download Summary")
             download_button_enhanced(summary, "summary.txt", "Download Summary")
             
             # Then show document metrics
-            st.subheader("📊 Document Statistics")
+            st.subheader("Document Statistics")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Characters", f"{len(content):,}")
@@ -5739,10 +5764,10 @@ with tabs[0]:
             with col4:
                 st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
 
-# Tab 2: Enhanced Code Analyzer (removed URL input)
+# Tab 2: Enhanced Code Analyzer
 with tabs[1]:
-    st.header("🧠 Quantum Code Analyzer")
-    st.write("*Deep code analysis with comprehensive metrics and optimization recommendations*")
+    st.header("Quantum Code Analyzer")
+    st.write("Deep code analysis with comprehensive metrics and optimization recommendations")
     
     col1, col2 = st.columns([2, 1])
     
@@ -5757,7 +5782,7 @@ with tabs[1]:
     with col2:
         code_file = st.file_uploader("Upload Python File", type=["py"], key="code_file_upload")
     
-    if st.button("🔍 Analyze Code", type="primary", key="code_analyze_btn"):
+    if st.button("Analyze Code", type="primary", key="code_analyze_btn"):
         code_content = ""
         
         if code_file:
@@ -5774,43 +5799,43 @@ with tabs[1]:
             with st.spinner("Analyzing code..."):
                 report = analyze_python_enhanced(code_content)
             
-            st.success("🎉 Analysis Complete!")
+            st.success("Analysis Complete!")
             
             # PRIORITY SECTION 1: ERRORS (Most Important)
-            st.header("❌ Errors")
+            st.header("Errors")
             if report["errors"]:
                 for error in report["errors"]:
                     st.error(error)
             else:
-                st.success("✅ No syntax errors found!")
+                st.success("No syntax errors found!")
             
             # PRIORITY SECTION 2: WARNINGS
-            st.header("⚠️ Warnings")
+            st.header("Warnings")
             if report["warnings"]:
                 for warning in report["warnings"]:
                     st.warning(warning)
             else:
-                st.success("✅ No warnings!")
+                st.success("No warnings!")
             
             # PRIORITY SECTION 3: SUGGESTIONS/RECOMMENDATIONS
-            st.header("💡 Suggestions & Recommendations")
+            st.header("Suggestions & Recommendations")
             for fix in report["fixes"]:
                 st.info(fix)
             
             # PRIORITY SECTION 4: CODE SUMMARY
-            st.header("📋 Code Summary")
+            st.header("Code Summary")
             st.write(report["purpose_summary"])
             
             # Copy functionality for main analysis
-            st.header("📋 Copy Analysis Report")
+            st.header("Copy Analysis Report")
             formatted_report = f"""CODE ANALYSIS REPORT
 ==================
 
 ERRORS ({len(report['errors'])} found):
-{chr(10).join(f"- {error}" for error in report['errors']) if report['errors'] else "✅ No errors"}
+{chr(10).join(f"- {error}" for error in report['errors']) if report['errors'] else "No errors"}
 
 WARNINGS ({len(report['warnings'])} found):
-{chr(10).join(f"- {warning}" for warning in report['warnings']) if report['warnings'] else "✅ No warnings"}
+{chr(10).join(f"- {warning}" for warning in report['warnings']) if report['warnings'] else "No warnings"}
 
 RECOMMENDATIONS:
 {chr(10).join(f"- {fix}" for fix in report['fixes'])}
@@ -5839,18 +5864,18 @@ DETAILED STATISTICS:
             copy_button(formatted_report, "Copy Full Report", key="code_report")
             
             # Download button for report
-            st.subheader("💾 Download Report")
+            st.subheader("Download Report")
             download_button_enhanced(formatted_report, "code_analysis_report.txt", "Download Report")
             
             # NOW SHOW DETAILED METRICS (Lower Priority)
-            st.header("📊 Detailed Code Metrics")
+            st.header("Detailed Code Metrics")
             
             # Functions and Classes Found
             col1, col2 = st.columns(2)
             
             with col1:
                 if report["functions"]:
-                    st.subheader("🔧 Functions Found")
+                    st.subheader("Functions Found")
                     for func in report["functions"][:10]:  # Show first 10
                         st.write(f"• `{func}()`")
                     if len(report["functions"]) > 10:
@@ -5859,7 +5884,7 @@ DETAILED STATISTICS:
                 # SAFE ACCESS TO builtin_functions_used
                 builtin_functions = report.get("builtin_functions_used", [])
                 if builtin_functions:
-                    st.subheader("🐍 Built-in Functions Used")
+                    st.subheader("Built-in Functions Used")
                     builtin_display = ", ".join(f"`{func}()`" for func in builtin_functions[:15])
                     st.write(builtin_display)
                     if len(builtin_functions) > 15:
@@ -5867,19 +5892,19 @@ DETAILED STATISTICS:
             
             with col2:
                 if report["classes"]:
-                    st.subheader("🏗️ Classes Found")
+                    st.subheader("Classes Found")
                     for cls in report["classes"]:
                         st.write(f"• `{cls}`")
                 
                 if report["variables"]:
-                    st.subheader("📝 Variables")
+                    st.subheader("Variables")
                     variables_display = ", ".join(f"`{var}`" for var in report["variables"][:20])
                     st.write(variables_display)
                     if len(report["variables"]) > 20:
                         st.write(f"... and {len(report['variables']) - 20} more variables")
             
             # Basic Statistics Section
-            st.subheader("📈 Line Statistics")
+            st.subheader("Line Statistics")
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -5896,7 +5921,7 @@ DETAILED STATISTICS:
                 st.metric("Print Statements", report["detailed_counts"].get("print_statements", 0))
             
             # Detailed Counts Section
-            st.subheader("🔧 Code Constructs")
+            st.subheader("Code Constructs")
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -5913,7 +5938,7 @@ DETAILED STATISTICS:
                 st.metric("Dict Comprehensions", report["detailed_counts"].get("dict_comprehensions", 0))
             
             # Code Quality Metrics
-            st.subheader("📊 Quality Metrics")
+            st.subheader("Quality Metrics")
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -5929,12 +5954,12 @@ DETAILED STATISTICS:
                 st.metric("Complexity Score", complexity)
             
             # Imports and Variables Details
-            with st.expander("📦 Imports & Variables Details", expanded=False):
+            with st.expander("Imports & Variables Details", expanded=False):
                 col1, col2 = st.columns(2)
                 
                 with col1:
                     if report["imports"]:
-                        st.subheader("📥 Imports")
+                        st.subheader("Imports")
                         for imp in report["imports"]:
                             st.code(imp, language="python")
                     else:
@@ -5942,13 +5967,13 @@ DETAILED STATISTICS:
                 
                 with col2:
                     if report["variables"]:
-                        st.subheader("📝 All Variables")
+                        st.subheader("All Variables")
                         st.write(", ".join(f"`{var}`" for var in report["variables"]))
 
-# Tab 3: NEW Code Corrector
+# Tab 3: Code Corrector
 with tabs[2]:
-    st.header("🔧 AI Code Corrector")
-    st.write("*Automatically fix common Python syntax errors and issues*")
+    st.header("AI Code Corrector")
+    st.write("Automatically fix common Python syntax errors and issues")
     
     col1, col2 = st.columns([2, 1])
     
@@ -5963,14 +5988,14 @@ with tabs[2]:
     with col2:
         wrong_code_file = st.file_uploader("Upload Buggy Python File", type=["py"], key="wrong_code_file")
         
-        st.info("🔧 **Auto-Fix Features:**\n"
+        st.info("**Auto-Fix Features:**\n"
                 "• Missing colons\n"
                 "• Indentation issues\n" 
                 "• Print statement syntax\n"
                 "• Unclosed quotes\n"
                 "• Common syntax errors")
     
-    if st.button("🛠️ Fix Code", type="primary", key="fix_code_btn"):
+    if st.button("Fix Code", type="primary", key="fix_code_btn"):
         code_to_fix = ""
         
         if wrong_code_file:
@@ -5981,22 +6006,22 @@ with tabs[2]:
         if not code_to_fix:
             st.warning("Please provide code to fix via input or file.")
         else:
-            with st.spinner("🔧 Applying fixes..."):
+            with st.spinner("Applying fixes..."):
                 fix_result = fix_python_code(code_to_fix)
             
             if fix_result["success"]:
-                st.success("✅ Code successfully fixed!")
+                st.success("Code successfully fixed!")
             else:
-                st.warning("⚠️ Partial fixes applied - some errors may remain")
+                st.warning("Partial fixes applied - some errors may remain")
             
             # Show fixes applied
-            st.subheader("🛠️ Fixes Applied")
+            st.subheader("Fixes Applied")
             for fix in fix_result["fixes_applied"]:
                 st.info(fix)
             
             # Show remaining errors if any
             if fix_result["remaining_errors"]:
-                st.subheader("❌ Remaining Issues")
+                st.subheader("Remaining Issues")
                 for error in fix_result["remaining_errors"]:
                     st.error(error)
             
@@ -6004,24 +6029,24 @@ with tabs[2]:
             col1, col2 = st.columns(2)
             
             with col1:
-                st.subheader("📝 Original Code")
+                st.subheader("Original Code")
                 st.code(fix_result["original"], language="python")
             
             with col2:
-                st.subheader("✨ Fixed Code")
+                st.subheader("Fixed Code")
                 st.code(fix_result["fixed"], language="python")
             
             # Copy and download functionality
-            st.subheader("📋 Copy Fixed Code")
+            st.subheader("Copy Fixed Code")
             copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
             
-            st.subheader("💾 Download Fixed Code")
+            st.subheader("Download Fixed Code")
             download_button_enhanced(fix_result["fixed"], "fixed_code.py", "Download Fixed Code", "text/x-python")
 
-# Tab 4: AI Detection (removed URL input)
+# Tab 4: AI Detection
 with tabs[3]:
-    st.header("🤖 Neural AI Detection")
-    st.write("*Advanced analysis to detect AI-generated code patterns*")
+    st.header("Neural AI Detection")
+    st.write("Advanced analysis to detect AI-generated code patterns")
     
     col1, col2 = st.columns([2, 1])
     
@@ -6034,16 +6059,16 @@ with tabs[3]:
         )
     
     with col2:
-        ai_code_file = st.file_uploader("Upload Code File", type["py"], key="ai_code_file")
+        ai_code_file = st.file_uploader("Upload Code File", type=["py"], key="ai_code_file")
         
-        st.info("🔍 **Detection Features:**\n"
+        st.info("**Detection Features:**\n"
                 "• Comment density analysis\n"
                 "• Generic naming patterns\n"
                 "• Code repetition metrics\n"
                 "• Formatting perfectness\n"
                 "• Statistical anomalies")
     
-    if st.button("🔍 Detect AI Patterns", type="primary", key="ai_detect_btn"):
+    if st.button("Detect AI Patterns", type="primary", key="ai_detect_btn"):
         ai_content = ""
         
         if ai_code_file:
@@ -6058,7 +6083,7 @@ with tabs[3]:
                 ai_result = detect_ai_generated_code(ai_content)
             
             # Show results
-            st.subheader("🎯 Detection Results")
+            st.subheader("Detection Results")
             
             # Main result with colored background
             score = ai_result["score"]
@@ -6071,12 +6096,12 @@ with tabs[3]:
             
             # Show reasons
             if ai_result["reasons"]:
-                st.subheader("📊 Analysis Details")
+                st.subheader("Analysis Details")
                 for reason in ai_result["reasons"]:
                     st.write(f"• {reason}")
             
             # Technical metrics
-            with st.expander("🔬 Technical Metrics", expanded=False):
+            with st.expander("Technical Metrics", expanded=False):
                 features = ai_result["features"]
                 col1, col2 = st.columns(2)
                 
@@ -6103,16 +6128,16 @@ Technical Metrics:
 - Repeated Line Ratio: {ai_result['features'].get('repeated_line_ratio', 0):.3f}
 - Perfect Formatting: {ai_result['features'].get('perfect_formatting', 0):.1f}"""
 
-            st.subheader("📋 Copy Detection Report")
+            st.subheader("Copy Detection Report")
             copy_button(ai_report, "Copy AI Report", key="ai_detection_report")
             
-            st.subheader("💾 Download Report")
+            st.subheader("Download Report")
             download_button_enhanced(ai_report, "ai_detection_report.txt", "Download AI Report")
 
 # Tab 5: URL Extractor
 with tabs[4]:
-    st.header("🌐 Web Content Extractor")
-    st.write("*Extract and analyze content from web pages*")
+    st.header("Web Content Extractor")
+    st.write("Extract and analyze content from web pages")
     
     url_input = st.text_input("Enter URL", placeholder="https://example.com", key="url_extractor_input")
     
@@ -6122,14 +6147,14 @@ with tabs[4]:
     with col2:
         max_chars = st.slider("Max Characters", 1000, 50000, 10000, key="max_chars")
     
-    if st.button("🌐 Extract Content", type="primary", key="extract_btn"):
+    if st.button("Extract Content", type="primary", key="extract_btn"):
         if not url_input.strip():
             st.warning("Please enter a URL.")
         else:
             with st.spinner("Fetching content..."):
                 content = fetch_from_url(url_input.strip())
             
-            if content.startswith("❌"):
+            if content.startswith("Error"):
                 st.error(content)
             else:
                 # Truncate if too long
@@ -6139,7 +6164,7 @@ with tabs[4]:
                 st.success("Content extracted successfully!")
                 
                 # Show content
-                st.subheader("📄 Extracted Content")
+                st.subheader("Extracted Content")
                 st.text_area("Content", content, height=300, key="extracted_content_display")
                 
                 # Analysis if requested
@@ -6147,7 +6172,7 @@ with tabs[4]:
                     with st.spinner("Analyzing content..."):
                         summary = summarize_text_advanced(content, max_sentences=5)
                     
-                    st.subheader("📊 Content Analysis")
+                    st.subheader("Content Analysis")
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
                         st.metric("Characters", f"{len(content):,}")
@@ -6158,25 +6183,25 @@ with tabs[4]:
                     with col4:
                         st.metric("Paragraphs", f"{len([p for p in content.split('\\n\\n') if p.strip()]):,}")
                     
-                    st.subheader("📋 Auto Summary")
+                    st.subheader("Auto Summary")
                     st.write(summary)
                     
                     # Copy summary
                     copy_button(summary, "Copy Summary", key="url_summary")
                 
                 # Copy full content
-                st.subheader("📋 Copy Content")
+                st.subheader("Copy Content")
                 copy_button(content, "Copy Full Content", key="url_content")
                 
                 # Download content
-                st.subheader("💾 Download Content")
+                st.subheader("Download Content")
                 download_button_enhanced(content, "extracted_content.txt", "Download Content")
 
 # Footer
 st.markdown("---")
 st.markdown(
     '<div style="text-align: center; color: rgba(0, 249, 255, 0.6); margin: 2rem 0;">'
-    '🌌 TECHNOVA AI NEXUS v2.1 | Powered by Advanced Neural Networks 🚀'
+    'TECHNOVA AI NEXUS v2.1 | Powered by Advanced Neural Networks'
     '</div>', 
     unsafe_allow_html=True
 )
