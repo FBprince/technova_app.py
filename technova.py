@@ -4871,7 +4871,6 @@
 
 
 
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -5549,7 +5548,8 @@ tabs = st.tabs([
 # Tab 1: Document Processor
 with tabs[0]:
     st.header("📄 Neural Document Processor")
-    st.write("*Advanced text analysis and summarization
+    st.write("*Advanced text analysis and summarization*")*")
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
