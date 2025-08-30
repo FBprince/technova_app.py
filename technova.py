@@ -4878,7 +4878,11 @@
 
 
 
+
+
+
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -4904,21 +4908,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Enhanced copy function with proper JavaScript
+# Fixed copy function using components.html
 def copy_button(text: str, label: str = "Copy", key: str = None):
-    """Enhanced copy button using JavaScript"""
+    """Fixed copy button using st.components.v1.html"""
     if text is None:
         text = ""
     
+    import html
+    escaped_text = html.escape(text)
     button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(text[:50]))}"
     
-    # Create a unique ID for this copy operation
-    unique_id = f"copy_text_{button_key}"
-    
-    # HTML with JavaScript for copy functionality
     copy_html = f"""
     <div style="margin: 10px 0;">
-        <button onclick="copyToClipboard_{unique_id}()" 
+        <button onclick="copyToClipboard_{button_key}()" 
                 style="background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
                        border: 1px solid rgba(0, 249, 255, 0.5);
                        color: #00f9ff;
@@ -4928,38 +4930,52 @@ def copy_button(text: str, label: str = "Copy", key: str = None):
                        font-weight: bold;">
             📋 {label}
         </button>
-        <span id="copy_status_{unique_id}" style="margin-left: 10px; color: #00f9ff;"></span>
+        <span id="copy_status_{button_key}" style="margin-left: 10px; color: #00f9ff;"></span>
     </div>
-    <textarea id="{unique_id}" readonly 
+    <textarea id="copy_text_{button_key}" readonly 
               style="width: 100%; height: 120px; 
                      background: rgba(0, 20, 40, 0.8);
                      border: 1px solid rgba(0, 249, 255, 0.3);
                      color: #00f9ff;
                      padding: 10px;
-                     border-radius: 4px;">{text}</textarea>
+                     border-radius: 4px;">{escaped_text}</textarea>
     
     <script>
-    function copyToClipboard_{unique_id}() {{
-        const textArea = document.getElementById('{unique_id}');
-        const statusSpan = document.getElementById('copy_status_{unique_id}');
+    function copyToClipboard_{button_key}() {{
+        const textArea = document.getElementById('copy_text_{button_key}');
+        const statusSpan = document.getElementById('copy_status_{button_key}');
         
-        textArea.select();
-        textArea.setSelectionRange(0, 99999);
+        if (navigator.clipboard && window.isSecureContext) {{
+            navigator.clipboard.writeText(textArea.value).then(() => {{
+                statusSpan.innerHTML = '✅ Copied!';
+                setTimeout(() => {{
+                    statusSpan.innerHTML = '';
+                }}, 2000);
+            }}).catch(() => {{
+                fallbackCopy();
+            }});
+        }} else {{
+            fallbackCopy();
+        }}
         
-        try {{
-            document.execCommand('copy');
-            statusSpan.innerHTML = '✅ Copied!';
-            setTimeout(() => {{
-                statusSpan.innerHTML = '';
-            }}, 2000);
-        }} catch (err) {{
-            statusSpan.innerHTML = '❌ Copy failed - please select text manually';
+        function fallbackCopy() {{
+            textArea.select();
+            textArea.setSelectionRange(0, 99999);
+            try {{
+                document.execCommand('copy');
+                statusSpan.innerHTML = '✅ Copied!';
+                setTimeout(() => {{
+                    statusSpan.innerHTML = '';
+                }}, 2000);
+            }} catch (err) {{
+                statusSpan.innerHTML = '❌ Copy failed - please select text manually';
+            }}
         }}
     }}
     </script>
     """
     
-    st.markdown(copy_html, unsafe_allow_html=True)
+    components.html(copy_html, height=200)
 
 # Enhanced download function
 def download_button_enhanced(content: str, filename: str, label: str, mime_type: str = "text/plain"):
@@ -4980,7 +4996,7 @@ def download_button_enhanced(content: str, filename: str, label: str, mime_type:
         💾 {label}
     </a>
     """
-    st.markdown(download_html, unsafe_allow_html=True)
+    components.html(download_html, height=60)
 
 # Simplified styling
 def set_tech_styling():
