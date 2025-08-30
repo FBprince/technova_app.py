@@ -5592,4 +5592,420 @@ def fetch_from_url(url: str) -> str:
             return resp.text
         
     except requests.exceptions.RequestException as e:
-        return f"Error fetching URL
+        return f"Error fetching URL: {str(e)}"
+
+def extract_pdf_text(file) -> str:
+    """Extract text from PDF file"""
+    if not PDF_AVAILABLE:
+        return "PyPDF2 not available for PDF processing"
+    
+    try:
+        pdf_reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    except Exception as e:
+        return f"Error extracting PDF: {str(e)}"
+
+# Main application tabs
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🔍 Text Analysis", 
+    "🐍 Python Code Tools", 
+    "🌐 Web Content", 
+    "📄 Document Processing", 
+    "🤖 AI Enhancement"
+])
+
+# Tab 1: Text Analysis
+with tab1:
+    st.header("📊 Advanced Text Analysis")
+    
+    text_input = st.text_area(
+        "Enter text to analyze:",
+        height=200,
+        placeholder="Paste your text here for comprehensive analysis..."
+    )
+    
+    if text_input:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📈 Basic Statistics")
+            words = len(text_input.split())
+            chars = len(text_input)
+            lines = len(text_input.splitlines())
+            sentences = len(safe_sentence_split(text_input))
+            
+            st.metric("Words", words)
+            st.metric("Characters", chars)
+            st.metric("Lines", lines)
+            st.metric("Sentences", sentences)
+            
+            # Word frequency analysis
+            st.subheader("🔤 Top Words")
+            words_list = re.findall(r'[A-Za-z]+', text_input.lower())
+            filtered_words = [w for w in words_list if w not in STOPWORDS and len(w) > 2]
+            word_freq = Counter(filtered_words)
+            
+            for word, freq in word_freq.most_common(10):
+                st.write(f"**{word}**: {freq}")
+        
+        with col2:
+            st.subheader("📝 Summary")
+            summary = summarize_text_advanced(text_input, max_sentences=5)
+            st.write(summary)
+            
+            st.subheader("🎯 Key Points")
+            bullet_summary = summarize_text_advanced(text_input, max_sentences=5, as_bullets=True)
+            st.markdown(bullet_summary)
+        
+        # Copy and download options
+        st.subheader("💾 Export Options")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            copy_button(summary, "Copy Summary", key="summary")
+        
+        with col2:
+            download_button_enhanced(
+                f"Text Analysis Report\n{'='*30}\n\nOriginal Text:\n{text_input}\n\nSummary:\n{summary}\n\nKey Points:\n{bullet_summary}",
+                "text_analysis_report.txt",
+                "Download Report"
+            )
+
+# Tab 2: Python Code Tools
+with tab2:
+    st.header("🐍 Python Code Analysis & Fixing")
+    
+    code_input = st.text_area(
+        "Enter Python code:",
+        height=300,
+        placeholder="Paste your Python code here for analysis and fixing..."
+    )
+    
+    if code_input:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("🔧 Code Fixing")
+            if st.button("Fix Code Syntax", type="primary"):
+                with st.spinner("Analyzing and fixing code..."):
+                    fix_result = fix_python_code(code_input)
+                
+                if fix_result["success"]:
+                    st.success("✅ Code fixed successfully!")
+                else:
+                    st.error("❌ Some issues could not be automatically fixed")
+                
+                st.subheader("Fixed Code:")
+                st.code(fix_result["fixed"], language="python")
+                
+                st.subheader("Fixes Applied:")
+                for fix in fix_result["fixes_applied"]:
+                    st.write(f"• {fix}")
+                
+                if fix_result["remaining_errors"]:
+                    st.subheader("⚠️ Remaining Issues:")
+                    for error in fix_result["remaining_errors"]:
+                        st.write(f"• {error}")
+                
+                # Copy fixed code
+                copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
+        
+        with col2:
+            st.subheader("📊 Code Analysis")
+            analysis = analyze_python_enhanced(code_input)
+            
+            # Basic stats
+            stats = analysis["basic_stats"]
+            st.metric("Total Lines", stats.get("total_lines", 0))
+            st.metric("Code Lines", stats.get("code_lines", 0))
+            st.metric("Functions", len(analysis["functions"]))
+            st.metric("Classes", len(analysis["classes"]))
+            
+            # Detailed counts
+            if analysis["detailed_counts"]:
+                st.subheader("🔍 Code Structure")
+                counts = analysis["detailed_counts"]
+                for item, count in counts.items():
+                    if count > 0:
+                        st.write(f"**{item.replace('_', ' ').title()}**: {count}")
+            
+            # Functions and classes
+            if analysis["functions"]:
+                st.subheader("⚙️ Functions")
+                st.write(", ".join(analysis["functions"]))
+            
+            if analysis["classes"]:
+                st.subheader("🏗️ Classes")
+                st.write(", ".join(analysis["classes"]))
+        
+        # AI-generated code detection
+        st.subheader("🤖 AI Generation Detection")
+        ai_result = detect_ai_generated_code(code_input)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("AI Score", f"{ai_result['score']}%")
+        with col2:
+            st.metric("Classification", ai_result['label'])
+        with col3:
+            confidence = "High" if ai_result['score'] > 70 or ai_result['score'] < 30 else "Medium"
+            st.metric("Confidence", confidence)
+        
+        if ai_result['reasons']:
+            st.write("**Detection Factors:**")
+            for reason in ai_result['reasons']:
+                st.write(f"• {reason}")
+
+# Tab 3: Web Content
+with tab3:
+    st.header("🌐 Web Content Analysis")
+    
+    url_input = st.text_input(
+        "Enter URL to analyze:",
+        placeholder="https://example.com"
+    )
+    
+    if url_input and st.button("Fetch & Analyze", type="primary"):
+        with st.spinner("Fetching content from URL..."):
+            content = fetch_from_url(url_input)
+        
+        if content and not content.startswith("Error"):
+            st.success("✅ Content fetched successfully!")
+            
+            # Show content preview
+            st.subheader("📄 Content Preview")
+            st.text_area("Fetched Content", content[:1000] + "..." if len(content) > 1000 else content, height=200)
+            
+            # Analysis
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📊 Statistics")
+                words = len(content.split())
+                chars = len(content)
+                lines = len(content.splitlines())
+                
+                st.metric("Words", words)
+                st.metric("Characters", chars)
+                st.metric("Lines", lines)
+            
+            with col2:
+                st.subheader("📝 Summary")
+                summary = summarize_text_advanced(content, max_sentences=5)
+                st.write(summary)
+            
+            # Export options
+            st.subheader("💾 Export Options")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                copy_button(content, "Copy Full Content", key="web_content")
+            
+            with col2:
+                download_button_enhanced(
+                    f"Web Content Analysis\nURL: {url_input}\n{'='*50}\n\n{content}",
+                    f"web_content_{url_input.split('/')[-1] or 'page'}.txt",
+                    "Download Content"
+                )
+        else:
+            st.error(f"Failed to fetch content: {content}")
+
+# Tab 4: Document Processing
+with tab4:
+    st.header("📄 Document Processing")
+    
+    uploaded_file = st.file_uploader(
+        "Upload a document",
+        type=['txt', 'pdf', 'py', 'md'],
+        help="Supported formats: TXT, PDF, Python, Markdown"
+    )
+    
+    if uploaded_file is not None:
+        file_type = uploaded_file.type
+        file_name = uploaded_file.name
+        
+        st.success(f"✅ Uploaded: {file_name}")
+        
+        # Extract content based on file type
+        try:
+            if file_type == "application/pdf":
+                content = extract_pdf_text(uploaded_file)
+            else:
+                content = str(uploaded_file.read(), "utf-8")
+            
+            # Show content preview
+            st.subheader("📄 Content Preview")
+            st.text_area("Document Content", content[:1000] + "..." if len(content) > 1000 else content, height=200)
+            
+            # Analysis based on file type
+            if file_name.endswith('.py'):
+                st.subheader("🐍 Python Code Analysis")
+                analysis = analyze_python_enhanced(content)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    stats = analysis["basic_stats"]
+                    st.metric("Total Lines", stats.get("total_lines", 0))
+                    st.metric("Code Lines", stats.get("code_lines", 0))
+                    st.metric("Functions", len(analysis["functions"]))
+                
+                with col2:
+                    if analysis["functions"]:
+                        st.write("**Functions:**")
+                        st.write(", ".join(analysis["functions"]))
+                    
+                    if analysis["classes"]:
+                        st.write("**Classes:**")
+                        st.write(", ".join(analysis["classes"]))
+            
+            else:
+                st.subheader("📊 Text Analysis")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    words = len(content.split())
+                    chars = len(content)
+                    lines = len(content.splitlines())
+                    
+                    st.metric("Words", words)
+                    st.metric("Characters", chars)
+                    st.metric("Lines", lines)
+                
+                with col2:
+                    summary = summarize_text_advanced(content, max_sentences=5)
+                    st.write("**Summary:**")
+                    st.write(summary)
+            
+            # Export options
+            st.subheader("💾 Export Options")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                copy_button(content, "Copy Content", key="doc_content")
+            
+            with col2:
+                download_button_enhanced(
+                    content,
+                    f"processed_{file_name}",
+                    "Download Processed"
+                )
+                
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+
+# Tab 5: AI Enhancement
+with tab5:
+    st.header("🤖 AI-Powered Enhancement")
+    
+    if not st.session_state.api_configured:
+        st.markdown("""
+        <div class="api-warning">
+            ⚠️ <strong>API Key Required</strong><br>
+            Please enter your OpenAI API key in the sidebar to use AI enhancement features.
+        </div>
+        """, unsafe_allow_html=True)
+    
+    enhancement_type = st.selectbox(
+        "Enhancement Type:",
+        ["Code Fixing", "Document Enhancement"],
+        help="Choose the type of AI enhancement you need"
+    )
+    
+    if enhancement_type == "Code Fixing":
+        st.subheader("🔧 AI Code Correction")
+        code_to_fix = st.text_area(
+            "Enter Python code to fix:",
+            height=250,
+            placeholder="Paste broken Python code here..."
+        )
+        
+        if code_to_fix and st.button("Fix with AI", type="primary"):
+            if st.session_state.api_configured:
+                with st.spinner("AI is analyzing and fixing your code..."):
+                    result = fix_code_with_ai(code_to_fix, st.session_state.get("openai_api_key"))
+                
+                if result["success"]:
+                    st.success("✅ Code fixed by AI!")
+                    
+                    st.subheader("🔧 Fixed Code:")
+                    st.code(result["fixed_code"], language="python")
+                    
+                    st.subheader("📋 Fixes Applied:")
+                    for fix in result["fixes_applied"]:
+                        st.write(f"• {fix}")
+                    
+                    st.subheader("💬 AI Explanation:")
+                    st.write(result["explanation"])
+                    
+                    copy_button(result["fixed_code"], "Copy Fixed Code", key="ai_fixed")
+                    
+                else:
+                    st.error("❌ AI couldn't fix the code")
+                    for fix in result["fixes_applied"]:
+                        st.write(f"• {fix}")
+            else:
+                st.warning("Please configure your OpenAI API key in the sidebar first.")
+    
+    else:  # Document Enhancement
+        st.subheader("📝 AI Document Enhancement")
+        
+        enhancement_style = st.selectbox(
+            "Enhancement Style:",
+            [
+                ("grammar_only", "Grammar & Spelling Only"),
+                ("professional", "Professional Tone"),
+                ("formal_concise", "Formal & Concise"),
+                ("persuasive", "Persuasive & Engaging"),
+                ("clear_simple", "Clear & Simple")
+            ],
+            format_func=lambda x: x[1]
+        )
+        
+        doc_to_enhance = st.text_area(
+            "Enter text to enhance:",
+            height=250,
+            placeholder="Paste your document text here..."
+        )
+        
+        if doc_to_enhance and st.button("Enhance with AI", type="primary"):
+            if st.session_state.api_configured:
+                with st.spinner("AI is enhancing your document..."):
+                    result = enhance_document_with_ai(
+                        doc_to_enhance, 
+                        enhancement_style[0], 
+                        st.session_state.get("openai_api_key")
+                    )
+                
+                if result["success"]:
+                    st.success("✅ Document enhanced by AI!")
+                    
+                    st.subheader("📄 Enhanced Text:")
+                    st.write(result["enhanced_text"])
+                    
+                    st.subheader("📋 Changes Made:")
+                    for change in result["changes_made"]:
+                        st.write(f"• {change}")
+                    
+                    st.subheader("📊 Improvement Summary:")
+                    st.write(result["improvement_summary"])
+                    
+                    copy_button(result["enhanced_text"], "Copy Enhanced Text", key="ai_enhanced")
+                    
+                else:
+                    st.error("❌ AI couldn't enhance the document")
+                    for change in result["changes_made"]:
+                        st.write(f"• {change}")
+            else:
+                st.warning("Please configure your OpenAI API key in the sidebar first.")
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: rgba(0, 249, 255, 0.6); font-style: italic;">
+    🌌 Technova AI Nexus v3.0 | Advanced AI-Powered Analysis Suite<br>
+    Built with Streamlit & Enhanced with OpenAI Integration
+</div>
+""", unsafe_allow_html=True)
