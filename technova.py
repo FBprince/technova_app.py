@@ -4874,6 +4874,10 @@
 
 
 
+
+
+
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -5762,102 +5766,220 @@ with tab1:
 
 # Tab 2: Python Code Tools
 with tab2:
-    st.header("🐍 Python Code Analysis & Fixing")
+    st.header("🐍 Python Code Analysis & Error Detection")
     
     code_input = st.text_area(
         "Enter Python code:",
         height=300,
-        placeholder="Paste your Python code here for analysis and fixing..."
+        placeholder="Paste your Python code here for analysis and error detection..."
     )
     
-    # Action buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        fix_code_button = st.button("🔧 Fix Code Syntax", type="primary", use_container_width=True)
-    with col2:
-        analyze_code_button = st.button("📊 Analyze Code", type="secondary", use_container_width=True)
+    # Action button
+    analyze_code_button = st.button("🔍 Analyze Code & Detect Errors", type="primary", use_container_width=True)
     
-    if code_input and (fix_code_button or analyze_code_button):
-        col1, col2 = st.columns(2)
+    if code_input and analyze_code_button:
+        # Error Detection Section
+        st.subheader("🚨 Error Detection & Analysis")
         
-        # Code Fixing Section
-        if fix_code_button:
-            with col1:
-                st.subheader("🔧 Code Fixing")
-                with st.spinner("Analyzing and fixing code..."):
-                    fix_result = fix_python_code(code_input)
-                
-                if fix_result["success"]:
-                    st.success("✅ Code fixed successfully!")
-                else:
-                    st.error("❌ Some issues could not be automatically fixed")
-                
-                st.subheader("Fixed Code:")
-                st.code(fix_result["fixed"], language="python")
-                
-                st.subheader("Fixes Applied:")
-                for fix in fix_result["fixes_applied"]:
-                    st.write(f"• {fix}")
-                
-                if fix_result["remaining_errors"]:
-                    st.subheader("⚠️ Remaining Issues:")
-                    for error in fix_result["remaining_errors"]:
-                        st.write(f"• {error}")
-                
-                # Copy fixed code
-                copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
+        # Check for syntax errors
+        syntax_errors = []
+        import_errors = []
+        indentation_errors = []
+        other_issues = []
+        
+        try:
+            # Test syntax
+            ast.parse(code_input)
+            st.success("✅ No syntax errors detected!")
+        except SyntaxError as e:
+            syntax_errors.append({
+                "type": "Syntax Error",
+                "line": e.lineno,
+                "message": e.msg,
+                "text": e.text.strip() if e.text else "N/A"
+            })
+        except IndentationError as e:
+            indentation_errors.append({
+                "type": "Indentation Error", 
+                "line": e.lineno,
+                "message": e.msg,
+                "text": e.text.strip() if e.text else "N/A"
+            })
+        
+        # Check for potential import issues
+        import_lines = [line.strip() for line in code_input.splitlines() if line.strip().startswith(('import ', 'from '))]
+        for i, line in enumerate(code_input.splitlines(), 1):
+            if line.strip().startswith(('import ', 'from ')):
+                # Check for common import issues
+                if ',' in line and 'from' in line and 'import' in line:
+                    # Multiple imports on one line
+                    other_issues.append({
+                        "type": "Style Warning",
+                        "line": i,
+                        "message": "Consider splitting multiple imports into separate lines",
+                        "text": line.strip()
+                    })
+        
+        # Check for common issues
+        lines = code_input.splitlines()
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            
+            # Check for missing colons
+            colon_keywords = ['if ', 'elif ', 'else', 'for ', 'while ', 'def ', 'class ', 'try', 'except', 'finally', 'with ']
+            if any(stripped.startswith(kw) for kw in colon_keywords):
+                if not stripped.endswith(':') and ':' not in stripped.split('#')[0]:
+                    other_issues.append({
+                        "type": "Missing Colon",
+                        "line": i,
+                        "message": "Missing colon at end of statement",
+                        "text": stripped
+                    })
+            
+            # Check for print statement issues (Python 2 vs 3)
+            if re.search(r'\bprint\s+[^(]', line) and not line.strip().startswith('#'):
+                other_issues.append({
+                    "type": "Print Statement",
+                    "line": i,
+                    "message": "Use print() function syntax instead of print statement",
+                    "text": stripped
+                })
+            
+            # Check for unclosed brackets
+            for bracket_pair in [('(', ')'), ('[', ']'), ('{', '}')]:
+                open_b, close_b = bracket_pair
+                if line.count(open_b) > line.count(close_b):
+                    other_issues.append({
+                        "type": "Unclosed Bracket",
+                        "line": i,
+                        "message": f"Possible unclosed '{open_b}' bracket",
+                        "text": stripped
+                    })
+        
+        # Display errors and solutions
+        all_errors = syntax_errors + indentation_errors + import_errors + other_issues
+        
+        if all_errors:
+            st.error(f"❌ Found {len(all_errors)} issue(s) in your code")
+            
+            for idx, error in enumerate(all_errors, 1):
+                with st.expander(f"🔴 Issue #{idx}: {error['type']} at Line {error['line']}", expanded=True):
+                    st.write(f"**Error Message:** {error['message']}")
+                    st.write(f"**Problematic Line:** `{error['text']}`")
+                    
+                    # Provide step-by-step solutions
+                    st.write("**💡 Step-by-Step Solution:**")
+                    
+                    if error['type'] == "Syntax Error":
+                        if "invalid syntax" in error['message'].lower():
+                            st.write("1. Check for missing colons `:` after if/for/while/def statements")
+                            st.write("2. Verify all brackets `()`, `[]`, `{}` are properly closed")
+                            st.write("3. Check for missing or extra quotation marks")
+                            st.write("4. Ensure proper indentation (4 spaces per level)")
+                        elif "unexpected EOF" in error['message'].lower():
+                            st.write("1. Check for unclosed parentheses, brackets, or quotes")
+                            st.write("2. Ensure all code blocks are properly closed")
+                        
+                    elif error['type'] == "Indentation Error":
+                        st.write("1. Use consistent indentation (4 spaces recommended)")
+                        st.write("2. Don't mix tabs and spaces")
+                        st.write("3. Ensure code after `:` is properly indented")
+                        st.write("4. Check that all code blocks are aligned correctly")
+                    
+                    elif error['type'] == "Missing Colon":
+                        st.write("1. Add a colon `:` at the end of the statement")
+                        st.write("2. Check that the line ends with `:` before the next indented block")
+                        original_line = error['text']
+                        st.code(f"# Fix: {original_line}:")
+                    
+                    elif error['type'] == "Print Statement":
+                        st.write("1. Change `print statement` to `print(statement)`")
+                        st.write("2. Add parentheses around the content to print")
+                        original_line = error['text']
+                        fixed_line = re.sub(r'\bprint\s+(.+)', r'print(\1)', original_line)
+                        st.code(f"# Fix: {fixed_line}")
+                    
+                    elif error['type'] == "Unclosed Bracket":
+                        st.write("1. Count your opening and closing brackets")
+                        st.write("2. Add the missing closing bracket")
+                        st.write("3. Use a code editor with bracket matching")
+                    
+                    elif error['type'] == "Style Warning":
+                        st.write("1. Split multiple imports into separate lines")
+                        st.write("2. Follow PEP 8 style guidelines")
+                        st.write("3. Use one import per line for better readability")
+        
+        else:
+            st.success("🎉 No errors detected! Your code looks clean.")
+        
+        st.markdown("---")
         
         # Code Analysis Section
-        if analyze_code_button or fix_code_button:
-            with col2 if fix_code_button else st.container():
-                st.subheader("📊 Code Analysis")
-                analysis = analyze_python_enhanced(code_input)
-                
-                # Basic stats
-                stats = analysis["basic_stats"]
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.metric("Total Lines", stats.get("total_lines", 0))
-                    st.metric("Code Lines", stats.get("code_lines", 0))
-                with col_b:
-                    st.metric("Functions", len(analysis["functions"]))
-                    st.metric("Classes", len(analysis["classes"]))
-                
-                # Detailed counts
-                if analysis["detailed_counts"]:
-                    st.subheader("🔍 Code Structure")
-                    counts = analysis["detailed_counts"]
-                    for item, count in counts.items():
-                        if count > 0:
-                            st.write(f"**{item.replace('_', ' ').title()}**: {count}")
-                
-                # Functions and classes
-                if analysis["functions"]:
-                    st.subheader("⚙️ Functions")
-                    st.write(", ".join(analysis["functions"]))
-                
-                if analysis["classes"]:
-                    st.subheader("🏗️ Classes")
-                    st.write(", ".join(analysis["classes"]))
+        st.subheader("📊 Code Analysis")
+        analysis = analyze_python_enhanced(code_input)
+        
+        # Basic stats
+        stats = analysis["basic_stats"]
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Lines", stats.get("total_lines", 0))
+        with col2:
+            st.metric("Code Lines", stats.get("code_lines", 0))
+        with col3:
+            st.metric("Functions", len(analysis["functions"]))
+        with col4:
+            st.metric("Classes", len(analysis["classes"]))
+        
+        # Detailed counts
+        if analysis["detailed_counts"]:
+            st.subheader("🔍 Code Structure")
+            counts = analysis["detailed_counts"]
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                for item, count in list(counts.items())[:len(counts)//2]:
+                    if count > 0:
+                        st.write(f"**{item.replace('_', ' ').title()}**: {count}")
+            
+            with col2:
+                for item, count in list(counts.items())[len(counts)//2:]:
+                    if count > 0:
+                        st.write(f"**{item.replace('_', ' ').title()}**: {count}")
+        
+        # Functions and classes
+        col1, col2 = st.columns(2)
+        with col1:
+            if analysis["functions"]:
+                st.subheader("⚙️ Functions Found")
+                for func in analysis["functions"]:
+                    st.write(f"• `{func}()`")
+        
+        with col2:
+            if analysis["classes"]:
+                st.subheader("🏗️ Classes Found")
+                for cls in analysis["classes"]:
+                    st.write(f"• `{cls}`")
         
         # AI-generated code detection
-        if analyze_code_button or fix_code_button:
-            st.subheader("🤖 AI Generation Detection")
-            ai_result = detect_ai_generated_code(code_input)
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("AI Score", f"{ai_result['score']}%")
-            with col2:
-                st.metric("Classification", ai_result['label'])
-            with col3:
-                confidence = "High" if ai_result['score'] > 70 or ai_result['score'] < 30 else "Medium"
-                st.metric("Confidence", confidence)
-            
-            if ai_result['reasons']:
-                st.write("**Detection Factors:**")
-                for reason in ai_result['reasons']:
-                    st.write(f"• {reason}")
+        st.subheader("🤖 AI Generation Detection")
+        ai_result = detect_ai_generated_code(code_input)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("AI Score", f"{ai_result['score']}%")
+        with col2:
+            st.metric("Classification", ai_result['label'])
+        with col3:
+            confidence = "High" if ai_result['score'] > 70 or ai_result['score'] < 30 else "Medium"
+            st.metric("Confidence", confidence)
+        
+        if ai_result['reasons']:
+            st.write("**Detection Factors:**")
+            for reason in ai_result['reasons']:
+                st.write(f"• {reason}")
+        
+        # Note about fixing
+        st.info("💡 **Note:** To automatically fix these errors, use the '🤖 AI Enhancement' tab with your OpenAI API key.")
 
 # Tab 3: Web Content
 with tab3:
@@ -5917,7 +6039,7 @@ with tab3:
 
 # Tab 4: AI Enhancement
 with tab4:
-    st.header("🤖 AI-Powered Enhancement")
+    st.header("🤖 AI-Powered Code & Document Enhancement")
     
     if not st.session_state.api_configured:
         st.markdown("""
@@ -5929,44 +6051,130 @@ with tab4:
     
     enhancement_type = st.selectbox(
         "Enhancement Type:",
-        ["Code Fixing", "Document Enhancement"],
+        ["Code Fixing (Python/HTML/CSS/JavaScript)", "Document Enhancement"],
         help="Choose the type of AI enhancement you need"
     )
     
-    if enhancement_type == "Code Fixing":
-        st.subheader("🔧 AI Code Correction")
-        code_to_fix = st.text_area(
-            "Enter Python code to fix:",
-            height=250,
-            placeholder="Paste broken Python code here..."
+    if enhancement_type == "Code Fixing (Python/HTML/CSS/JavaScript)":
+        st.subheader("🔧 AI Code Correction & Enhancement")
+        
+        code_language = st.selectbox(
+            "Select Programming Language:",
+            ["Python", "HTML", "CSS", "JavaScript", "Auto-detect"],
+            help="Choose the programming language for better AI assistance"
         )
         
-        fix_ai_button = st.button("🤖 Fix with AI", type="primary", use_container_width=True)
+        code_to_fix = st.text_area(
+            f"Enter {code_language if code_language != 'Auto-detect' else 'your'} code to fix/enhance:",
+            height=300,
+            placeholder="Paste your code here for AI-powered fixing and enhancement..."
+        )
         
-        if code_to_fix and fix_ai_button:
+        col1, col2 = st.columns(2)
+        with col1:
+            fix_ai_button = st.button("🤖 Fix Code with AI", type="primary", use_container_width=True)
+        with col2:
+            enhance_ai_button = st.button("✨ Enhance & Optimize Code", type="secondary", use_container_width=True)
+        
+        if code_to_fix and (fix_ai_button or enhance_ai_button):
             if st.session_state.api_configured:
-                with st.spinner("AI is analyzing and fixing your code..."):
-                    result = fix_code_with_ai(code_to_fix, st.session_state.get("openai_api_key"))
+                action_type = "fix and correct errors in" if fix_ai_button else "enhance, optimize, and improve"
                 
-                if result["success"]:
-                    st.success("✅ Code fixed by AI!")
+                with st.spinner(f"AI is working on your {code_language} code..."):
+                    # Enhanced AI prompt for multi-language support
+                    client = openai.OpenAI(api_key=st.session_state.get("openai_api_key"))
                     
-                    st.subheader("🔧 Fixed Code:")
-                    st.code(result["fixed_code"], language="python")
+                    if code_language == "Auto-detect":
+                        detect_prompt = "What programming language is this code written in? Just respond with the language name."
+                        detect_response = client.chat.completions.create(
+                            model="gpt-4",
+                            messages=[{"role": "user", "content": f"{detect_prompt}\n\n```\n{code_to_fix}\n```"}],
+                            temperature=0.1,
+                            max_tokens=50
+                        )
+                        detected_lang = detect_response.choices[0].message.content.strip()
+                        st.info(f"🔍 Detected Language: {detected_lang}")
+                        lang_for_prompt = detected_lang
+                    else:
+                        lang_for_prompt = code_language
                     
-                    st.subheader("📋 Fixes Applied:")
-                    for fix in result["fixes_applied"]:
-                        st.write(f"• {fix}")
-                    
-                    st.subheader("💬 AI Explanation:")
-                    st.write(result["explanation"])
-                    
-                    copy_button(result["fixed_code"], "Copy Fixed Code", key="ai_fixed")
-                    
-                else:
-                    st.error("❌ AI couldn't fix the code")
-                    for fix in result["fixes_applied"]:
-                        st.write(f"• {fix}")
+                    prompt = f"""You are an expert {lang_for_prompt} developer. Please {action_type} the following {lang_for_prompt} code and provide a detailed explanation.
+
+IMPORTANT: Return your response in valid JSON format with these exact fields:
+- "success": boolean
+- "fixed_code": string (the corrected/enhanced code)
+- "fixes_applied": list of strings (what was fixed/improved)
+- "explanation": string (detailed explanation)
+- "language": string (programming language)
+
+Original {lang_for_prompt} code:
+```{lang_for_prompt.lower()}
+{code_to_fix}
+```
+
+For fixing: Focus on syntax errors, logic issues, security vulnerabilities, and best practices.
+For enhancement: Optimize performance, improve readability, add error handling, follow best practices, and add helpful comments.
+
+Return only valid JSON, no other text."""
+
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-4",
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.3,
+                            max_tokens=4000
+                        )
+                        
+                        result = json.loads(response.choices[0].message.content)
+                        
+                        if result.get("success", False):
+                            action_word = "fixed" if fix_ai_button else "enhanced"
+                            st.success(f"✅ Code {action_word} successfully by AI!")
+                            
+                            st.subheader(f"🔧 {action_word.title()} Code:")
+                            language_map = {
+                                "Python": "python",
+                                "HTML": "html", 
+                                "CSS": "css",
+                                "JavaScript": "javascript"
+                            }
+                            display_lang = language_map.get(result.get("language", lang_for_prompt), "text")
+                            st.code(result["fixed_code"], language=display_lang)
+                            
+                            st.subheader("📋 Changes Applied:")
+                            for fix in result["fixes_applied"]:
+                                st.write(f"• {fix}")
+                            
+                            st.subheader("💬 AI Explanation:")
+                            st.write(result["explanation"])
+                            
+                            # Export options
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                copy_button(result["fixed_code"], f"Copy {action_word.title()} Code", key="ai_fixed_code")
+                            
+                            with col2:
+                                file_extension = {
+                                    "Python": ".py",
+                                    "HTML": ".html",
+                                    "CSS": ".css", 
+                                    "JavaScript": ".js"
+                                }.get(result.get("language", lang_for_prompt), ".txt")
+                                
+                                download_button_enhanced(
+                                    result["fixed_code"],
+                                    f"{action_word}_code{file_extension}",
+                                    f"Download {action_word.title()} Code"
+                                )
+                        else:
+                            st.error("❌ AI couldn't process the code")
+                            for fix in result.get("fixes_applied", []):
+                                st.write(f"• {fix}")
+                        
+                    except json.JSONDecodeError:
+                        st.error("❌ Failed to parse AI response. Please try again.")
+                    except Exception as e:
+                        st.error(f"❌ AI processing failed: {str(e)}")
             else:
                 st.warning("Please configure your OpenAI API key in the sidebar first.")
     
@@ -5980,7 +6188,9 @@ with tab4:
                 ("professional", "Professional Tone"),
                 ("formal_concise", "Formal & Concise"),
                 ("persuasive", "Persuasive & Engaging"),
-                ("clear_simple", "Clear & Simple")
+                ("clear_simple", "Clear & Simple"),
+                ("creative", "Creative & Engaging"),
+                ("technical", "Technical & Detailed")
             ],
             format_func=lambda x: x[1]
         )
@@ -5988,10 +6198,10 @@ with tab4:
         doc_to_enhance = st.text_area(
             "Enter text to enhance:",
             height=250,
-            placeholder="Paste your document text here..."
+            placeholder="Paste your document text here for AI-powered enhancement..."
         )
         
-        enhance_button = st.button("✨ Enhance with AI", type="primary", use_container_width=True)
+        enhance_button = st.button("✨ Enhance Document with AI", type="primary", use_container_width=True)
         
         if doc_to_enhance and enhance_button:
             if st.session_state.api_configured:
@@ -6015,7 +6225,17 @@ with tab4:
                     st.subheader("📊 Improvement Summary:")
                     st.write(result["improvement_summary"])
                     
-                    copy_button(result["enhanced_text"], "Copy Enhanced Text", key="ai_enhanced")
+                    # Export options
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        copy_button(result["enhanced_text"], "Copy Enhanced Text", key="ai_enhanced_doc")
+                    
+                    with col2:
+                        download_button_enhanced(
+                            result["enhanced_text"],
+                            "enhanced_document.txt",
+                            "Download Enhanced Text"
+                        )
                     
                 else:
                     st.error("❌ AI couldn't enhance the document")
