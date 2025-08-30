@@ -4874,7 +4874,6 @@
 
 
 
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -5609,70 +5608,157 @@ def extract_pdf_text(file) -> str:
         return f"Error extracting PDF: {str(e)}"
 
 # Main application tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🔍 Text Analysis", 
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Text & Document Analysis", 
     "🐍 Python Code Tools", 
     "🌐 Web Content", 
-    "📄 Document Processing", 
     "🤖 AI Enhancement"
 ])
 
-# Tab 1: Text Analysis
+# Tab 1: Combined Text Analysis and Document Processing
 with tab1:
-    st.header("📊 Advanced Text Analysis")
+    st.header("📊 Text & Document Analysis")
     
-    text_input = st.text_area(
-        "Enter text to analyze:",
-        height=200,
-        placeholder="Paste your text here for comprehensive analysis..."
+    # Input method selection
+    input_method = st.radio(
+        "Choose input method:",
+        ["✍️ Type/Paste Text", "📁 Upload Document"],
+        horizontal=True
     )
     
-    if text_input:
-        col1, col2 = st.columns(2)
+    text_content = ""
+    
+    if input_method == "✍️ Type/Paste Text":
+        text_input = st.text_area(
+            "Enter text to analyze:",
+            height=200,
+            placeholder="Paste your text here for comprehensive analysis..."
+        )
         
-        with col1:
-            st.subheader("📈 Basic Statistics")
-            words = len(text_input.split())
-            chars = len(text_input)
-            lines = len(text_input.splitlines())
-            sentences = len(safe_sentence_split(text_input))
-            
-            st.metric("Words", words)
-            st.metric("Characters", chars)
-            st.metric("Lines", lines)
-            st.metric("Sentences", sentences)
-            
-            # Word frequency analysis
-            st.subheader("🔤 Top Words")
-            words_list = re.findall(r'[A-Za-z]+', text_input.lower())
-            filtered_words = [w for w in words_list if w not in STOPWORDS and len(w) > 2]
-            word_freq = Counter(filtered_words)
-            
-            for word, freq in word_freq.most_common(10):
-                st.write(f"**{word}**: {freq}")
+        analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True)
         
-        with col2:
-            st.subheader("📝 Summary")
-            summary = summarize_text_advanced(text_input, max_sentences=5)
-            st.write(summary)
-            
-            st.subheader("🎯 Key Points")
-            bullet_summary = summarize_text_advanced(text_input, max_sentences=5, as_bullets=True)
-            st.markdown(bullet_summary)
+        if analyze_button and text_input:
+            text_content = text_input
+    
+    else:  # Upload Document
+        uploaded_file = st.file_uploader(
+            "Upload a document",
+            type=['txt', 'pdf', 'py', 'md'],
+            help="Supported formats: TXT, PDF, Python, Markdown"
+        )
         
-        # Copy and download options
+        if uploaded_file is not None:
+            file_type = uploaded_file.type
+            file_name = uploaded_file.name
+            
+            st.success(f"✅ Uploaded: {file_name}")
+            
+            analyze_document_button = st.button("📄 Process Document", type="primary", use_container_width=True)
+            
+            if analyze_document_button:
+                # Extract content based on file type
+                try:
+                    if file_type == "application/pdf":
+                        text_content = extract_pdf_text(uploaded_file)
+                    else:
+                        text_content = str(uploaded_file.read(), "utf-8")
+                    
+                    st.subheader("📄 Document Content Preview")
+                    st.text_area("Extracted Content", text_content[:1000] + "..." if len(text_content) > 1000 else text_content, height=200)
+                        
+                except Exception as e:
+                    st.error(f"Error processing file: {str(e)}")
+                    text_content = ""
+    
+    # Analysis section (shown when content is available)
+    if text_content:
+        st.markdown("---")
+        
+        # Check if it's Python code for specialized analysis
+        is_python_code = text_content.strip().startswith(('def ', 'class ', 'import ', 'from ')) or 'def ' in text_content
+        
+        if is_python_code and input_method == "📁 Upload Document":
+            st.subheader("🐍 Python Code Analysis")
+            analysis = analyze_python_enhanced(text_content)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                stats = analysis["basic_stats"]
+                st.metric("Total Lines", stats.get("total_lines", 0))
+                st.metric("Code Lines", stats.get("code_lines", 0))
+            with col2:
+                st.metric("Functions", len(analysis["functions"]))
+                st.metric("Classes", len(analysis["classes"]))
+            with col3:
+                st.metric("Imports", len(analysis["imports"]))
+                complexity = analysis["complexity_metrics"].get("cyclomatic_complexity_estimate", 0)
+                st.metric("Complexity", complexity)
+            
+            if analysis["functions"]:
+                st.subheader("⚙️ Functions Found")
+                st.write(", ".join(analysis["functions"]))
+            
+            if analysis["classes"]:
+                st.subheader("🏗️ Classes Found")
+                st.write(", ".join(analysis["classes"]))
+                
+        else:
+            # Regular text analysis
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📈 Basic Statistics")
+                words = len(text_content.split())
+                chars = len(text_content)
+                lines = len(text_content.splitlines())
+                sentences = len(safe_sentence_split(text_content))
+                
+                st.metric("Words", words)
+                st.metric("Characters", chars)
+                st.metric("Lines", lines)
+                st.metric("Sentences", sentences)
+                
+                # Word frequency analysis
+                st.subheader("🔤 Top Words")
+                words_list = re.findall(r'[A-Za-z]+', text_content.lower())
+                filtered_words = [w for w in words_list if w not in STOPWORDS and len(w) > 2]
+                word_freq = Counter(filtered_words)
+                
+                for word, freq in word_freq.most_common(10):
+                    st.write(f"**{word}**: {freq}")
+            
+            with col2:
+                st.subheader("📝 Summary")
+                summary = summarize_text_advanced(text_content, max_sentences=5)
+                st.write(summary)
+                
+                st.subheader("🎯 Key Points")
+                bullet_summary = summarize_text_advanced(text_content, max_sentences=5, as_bullets=True)
+                st.markdown(bullet_summary)
+        
+        # Export options
         st.subheader("💾 Export Options")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            copy_button(summary, "Copy Summary", key="summary")
+            copy_button(text_content, "Copy Full Text", key="full_text")
         
         with col2:
-            download_button_enhanced(
-                f"Text Analysis Report\n{'='*30}\n\nOriginal Text:\n{text_input}\n\nSummary:\n{summary}\n\nKey Points:\n{bullet_summary}",
-                "text_analysis_report.txt",
-                "Download Report"
-            )
+            if not is_python_code:
+                summary = summarize_text_advanced(text_content, max_sentences=5)
+                copy_button(summary, "Copy Summary", key="summary")
+        
+        with col3:
+            if is_python_code:
+                report_content = f"Python Code Analysis Report\n{'='*40}\n\n{text_content}\n\nAnalysis completed successfully."
+                filename = "python_analysis_report.txt"
+            else:
+                summary = summarize_text_advanced(text_content, max_sentences=5)
+                bullet_summary = summarize_text_advanced(text_content, max_sentences=5, as_bullets=True)
+                report_content = f"Text Analysis Report\n{'='*30}\n\nOriginal Text:\n{text_content}\n\nSummary:\n{summary}\n\nKey Points:\n{bullet_summary}"
+                filename = "text_analysis_report.txt"
+            
+            download_button_enhanced(report_content, filename, "Download Report")
 
 # Tab 2: Python Code Tools
 with tab2:
@@ -5684,12 +5770,20 @@ with tab2:
         placeholder="Paste your Python code here for analysis and fixing..."
     )
     
-    if code_input:
+    # Action buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        fix_code_button = st.button("🔧 Fix Code Syntax", type="primary", use_container_width=True)
+    with col2:
+        analyze_code_button = st.button("📊 Analyze Code", type="secondary", use_container_width=True)
+    
+    if code_input and (fix_code_button or analyze_code_button):
         col1, col2 = st.columns(2)
         
-        with col1:
-            st.subheader("🔧 Code Fixing")
-            if st.button("Fix Code Syntax", type="primary"):
+        # Code Fixing Section
+        if fix_code_button:
+            with col1:
+                st.subheader("🔧 Code Fixing")
                 with st.spinner("Analyzing and fixing code..."):
                     fix_result = fix_python_code(code_input)
                 
@@ -5713,51 +5807,57 @@ with tab2:
                 # Copy fixed code
                 copy_button(fix_result["fixed"], "Copy Fixed Code", key="fixed_code")
         
-        with col2:
-            st.subheader("📊 Code Analysis")
-            analysis = analyze_python_enhanced(code_input)
-            
-            # Basic stats
-            stats = analysis["basic_stats"]
-            st.metric("Total Lines", stats.get("total_lines", 0))
-            st.metric("Code Lines", stats.get("code_lines", 0))
-            st.metric("Functions", len(analysis["functions"]))
-            st.metric("Classes", len(analysis["classes"]))
-            
-            # Detailed counts
-            if analysis["detailed_counts"]:
-                st.subheader("🔍 Code Structure")
-                counts = analysis["detailed_counts"]
-                for item, count in counts.items():
-                    if count > 0:
-                        st.write(f"**{item.replace('_', ' ').title()}**: {count}")
-            
-            # Functions and classes
-            if analysis["functions"]:
-                st.subheader("⚙️ Functions")
-                st.write(", ".join(analysis["functions"]))
-            
-            if analysis["classes"]:
-                st.subheader("🏗️ Classes")
-                st.write(", ".join(analysis["classes"]))
+        # Code Analysis Section
+        if analyze_code_button or fix_code_button:
+            with col2 if fix_code_button else st.container():
+                st.subheader("📊 Code Analysis")
+                analysis = analyze_python_enhanced(code_input)
+                
+                # Basic stats
+                stats = analysis["basic_stats"]
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.metric("Total Lines", stats.get("total_lines", 0))
+                    st.metric("Code Lines", stats.get("code_lines", 0))
+                with col_b:
+                    st.metric("Functions", len(analysis["functions"]))
+                    st.metric("Classes", len(analysis["classes"]))
+                
+                # Detailed counts
+                if analysis["detailed_counts"]:
+                    st.subheader("🔍 Code Structure")
+                    counts = analysis["detailed_counts"]
+                    for item, count in counts.items():
+                        if count > 0:
+                            st.write(f"**{item.replace('_', ' ').title()}**: {count}")
+                
+                # Functions and classes
+                if analysis["functions"]:
+                    st.subheader("⚙️ Functions")
+                    st.write(", ".join(analysis["functions"]))
+                
+                if analysis["classes"]:
+                    st.subheader("🏗️ Classes")
+                    st.write(", ".join(analysis["classes"]))
         
         # AI-generated code detection
-        st.subheader("🤖 AI Generation Detection")
-        ai_result = detect_ai_generated_code(code_input)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("AI Score", f"{ai_result['score']}%")
-        with col2:
-            st.metric("Classification", ai_result['label'])
-        with col3:
-            confidence = "High" if ai_result['score'] > 70 or ai_result['score'] < 30 else "Medium"
-            st.metric("Confidence", confidence)
-        
-        if ai_result['reasons']:
-            st.write("**Detection Factors:**")
-            for reason in ai_result['reasons']:
-                st.write(f"• {reason}")
+        if analyze_code_button or fix_code_button:
+            st.subheader("🤖 AI Generation Detection")
+            ai_result = detect_ai_generated_code(code_input)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("AI Score", f"{ai_result['score']}%")
+            with col2:
+                st.metric("Classification", ai_result['label'])
+            with col3:
+                confidence = "High" if ai_result['score'] > 70 or ai_result['score'] < 30 else "Medium"
+                st.metric("Confidence", confidence)
+            
+            if ai_result['reasons']:
+                st.write("**Detection Factors:**")
+                for reason in ai_result['reasons']:
+                    st.write(f"• {reason}")
 
 # Tab 3: Web Content
 with tab3:
@@ -5768,7 +5868,9 @@ with tab3:
         placeholder="https://example.com"
     )
     
-    if url_input and st.button("Fetch & Analyze", type="primary"):
+    fetch_button = st.button("🌐 Fetch & Analyze Content", type="primary", use_container_width=True)
+    
+    if url_input and fetch_button:
         with st.spinner("Fetching content from URL..."):
             content = fetch_from_url(url_input)
         
@@ -5813,91 +5915,8 @@ with tab3:
         else:
             st.error(f"Failed to fetch content: {content}")
 
-# Tab 4: Document Processing
+# Tab 4: AI Enhancement
 with tab4:
-    st.header("📄 Document Processing")
-    
-    uploaded_file = st.file_uploader(
-        "Upload a document",
-        type=['txt', 'pdf', 'py', 'md'],
-        help="Supported formats: TXT, PDF, Python, Markdown"
-    )
-    
-    if uploaded_file is not None:
-        file_type = uploaded_file.type
-        file_name = uploaded_file.name
-        
-        st.success(f"✅ Uploaded: {file_name}")
-        
-        # Extract content based on file type
-        try:
-            if file_type == "application/pdf":
-                content = extract_pdf_text(uploaded_file)
-            else:
-                content = str(uploaded_file.read(), "utf-8")
-            
-            # Show content preview
-            st.subheader("📄 Content Preview")
-            st.text_area("Document Content", content[:1000] + "..." if len(content) > 1000 else content, height=200)
-            
-            # Analysis based on file type
-            if file_name.endswith('.py'):
-                st.subheader("🐍 Python Code Analysis")
-                analysis = analyze_python_enhanced(content)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    stats = analysis["basic_stats"]
-                    st.metric("Total Lines", stats.get("total_lines", 0))
-                    st.metric("Code Lines", stats.get("code_lines", 0))
-                    st.metric("Functions", len(analysis["functions"]))
-                
-                with col2:
-                    if analysis["functions"]:
-                        st.write("**Functions:**")
-                        st.write(", ".join(analysis["functions"]))
-                    
-                    if analysis["classes"]:
-                        st.write("**Classes:**")
-                        st.write(", ".join(analysis["classes"]))
-            
-            else:
-                st.subheader("📊 Text Analysis")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    words = len(content.split())
-                    chars = len(content)
-                    lines = len(content.splitlines())
-                    
-                    st.metric("Words", words)
-                    st.metric("Characters", chars)
-                    st.metric("Lines", lines)
-                
-                with col2:
-                    summary = summarize_text_advanced(content, max_sentences=5)
-                    st.write("**Summary:**")
-                    st.write(summary)
-            
-            # Export options
-            st.subheader("💾 Export Options")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                copy_button(content, "Copy Content", key="doc_content")
-            
-            with col2:
-                download_button_enhanced(
-                    content,
-                    f"processed_{file_name}",
-                    "Download Processed"
-                )
-                
-        except Exception as e:
-            st.error(f"Error processing file: {str(e)}")
-
-# Tab 5: AI Enhancement
-with tab5:
     st.header("🤖 AI-Powered Enhancement")
     
     if not st.session_state.api_configured:
@@ -5922,7 +5941,9 @@ with tab5:
             placeholder="Paste broken Python code here..."
         )
         
-        if code_to_fix and st.button("Fix with AI", type="primary"):
+        fix_ai_button = st.button("🤖 Fix with AI", type="primary", use_container_width=True)
+        
+        if code_to_fix and fix_ai_button:
             if st.session_state.api_configured:
                 with st.spinner("AI is analyzing and fixing your code..."):
                     result = fix_code_with_ai(code_to_fix, st.session_state.get("openai_api_key"))
@@ -5970,7 +5991,9 @@ with tab5:
             placeholder="Paste your document text here..."
         )
         
-        if doc_to_enhance and st.button("Enhance with AI", type="primary"):
+        enhance_button = st.button("✨ Enhance with AI", type="primary", use_container_width=True)
+        
+        if doc_to_enhance and enhance_button:
             if st.session_state.api_configured:
                 with st.spinner("AI is enhancing your document..."):
                     result = enhance_document_with_ai(
