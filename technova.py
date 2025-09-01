@@ -6756,4 +6756,5 @@ def main():
         st.info("Please refresh the page or contact support if the issue persists.")
 
 if __name__ == "__main__":
-    main()%
+    main()
+
