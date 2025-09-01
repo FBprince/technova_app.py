@@ -4868,8 +4868,6 @@
 
 
 
-
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4877,7 +4875,7 @@ from bs4 import BeautifulSoup
 import re
 import base64
 import ast
-from collections import Counter, defaultdict
+from collections import Counter
 import io
 import json
 import hashlib
@@ -4900,7 +4898,7 @@ class InMemoryDB:
         if 'db_users' not in st.session_state:
             st.session_state.db_users = {}
         if 'db_usage' not in st.session_state:
-            st.session_state.db_usage = defaultdict(lambda: defaultdict(int))
+            st.session_state.db_usage = {}
     
     def create_user(self, username: str, password_hash: str) -> bool:
         if username in st.session_state.db_users:
@@ -4919,12 +4917,12 @@ class InMemoryDB:
         return st.session_state.db_users.get(username)
     
     def log_usage(self, username: str, tab_name: str):
-        today = datetime.now().date()
+        today = datetime.now().date().isoformat()  # Convert to string for consistent keys
         key = f"{username}_{tab_name}_{today}"
-        st.session_state.db_usage[key] += 1
+        st.session_state.db_usage[key] = st.session_state.db_usage.get(key, 0) + 1
     
     def get_usage_count(self, username: str, tab_name: str) -> int:
-        today = datetime.now().date()
+        today = datetime.now().date().isoformat()  # Convert to string for consistent keys
         key = f"{username}_{tab_name}_{today}"
         return st.session_state.db_usage.get(key, 0)
 
