@@ -4877,6 +4877,7 @@
 
 
 
+
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4891,14 +4892,10 @@ import openai
 from typing import Optional, Dict, List
 import sqlite3
 import hashlib
-import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
 import random
 import string
 from datetime import datetime, timedelta
 import os
-import bcrypt
 
 # PDF extraction (optional)
 try:
@@ -4917,27 +4914,12 @@ st.set_page_config(
 # Streamlit Secrets Configuration
 try:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-    SMTP_SERVER = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
-    SMTP_PORT = int(st.secrets.get("SMTP_PORT", 587))
-    SMTP_USERNAME = st.secrets.get("SMTP_USERNAME", "")
-    SMTP_PASSWORD = st.secrets.get("SMTP_PASSWORD", "")
-    STRIPE_SECRET_KEY = st.secrets.get("STRIPE_SECRET_KEY", "")
 except KeyError as e:
-    st.error(f"Missing secret configuration: {e}")
+    st.error(f"Missing OpenAI API key configuration: {e}")
     OPENAI_API_KEY = ""
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_USERNAME = ""
-    SMTP_PASSWORD = ""
-    STRIPE_SECRET_KEY = ""
 except Exception as e:
     st.error(f"Error loading secrets: {e}")
     OPENAI_API_KEY = ""
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_USERNAME = ""
-    SMTP_PASSWORD = ""
-    STRIPE_SECRET_KEY = ""
 
 # Database Setup
 def init_database():
@@ -4945,18 +4927,15 @@ def init_database():
     conn = sqlite3.connect('technova.db')
     cursor = conn.cursor()
     
-    # Users table
+    # Users table (simplified without email verification)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
+            username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_verified BOOLEAN DEFAULT FALSE,
             subscription_type TEXT DEFAULT 'free',
-            subscription_expires TIMESTAMP,
-            verification_code TEXT,
-            verification_expires TIMESTAMP
+            subscription_expires TIMESTAMP
         )
     ''')
     
@@ -4979,102 +4958,44 @@ def init_database():
 # Initialize database on startup
 init_database()
 
-# Authentication Functions
+# Authentication Functions (simplified)
 class AuthManager:
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hash a password using bcrypt"""
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        """Hash a password using SHA256 (simplified)"""
+        return hashlib.sha256(password.encode()).hexdigest()
     
     @staticmethod
     def verify_password(password: str, hashed: str) -> bool:
         """Verify a password against its hash"""
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+        return hashlib.sha256(password.encode()).hexdigest() == hashed
     
     @staticmethod
-    def generate_verification_code() -> str:
-        """Generate a 6-digit verification code"""
-        return ''.join(random.choices(string.digits, k=6))
-    
-    @staticmethod
-    def is_valid_gmail(email: str) -> bool:
-        """Check if email is a valid Gmail address"""
-        gmail_pattern = r'^[a-zA-Z0-9._%+-]+@gmail\.com$'
-        return bool(re.match(gmail_pattern, email))
-    
-    @staticmethod
-    def send_verification_email(email: str, verification_code: str) -> bool:
-        """Send verification code via email"""
-        if not SMTP_USERNAME or not SMTP_PASSWORD:
-            st.error("Email service not configured. Please contact administrator.")
-            return False
-        
-        try:
-            msg = MimeMultipart()
-            msg['From'] = SMTP_USERNAME
-            msg['To'] = email
-            msg['Subject'] = "TechNova AI Nexus - Verification Code"
-            
-            body = f"""
-            Welcome to TechNova AI Nexus!
-            
-            Your verification code is: {verification_code}
-            
-            This code will expire in 10 minutes.
-            
-            Best regards,
-            TechNova Team
-            """
-            
-            msg.attach(MimeText(body, 'plain'))
-            
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            text = msg.as_string()
-            server.sendmail(SMTP_USERNAME, email, text)
-            server.quit()
-            
-            return True
-        except Exception as e:
-            st.error(f"Failed to send verification email: {str(e)}")
-            return False
-    
-    @staticmethod
-    def create_user(email: str, password: str) -> tuple[bool, str]:
-        """Create a new user account"""
-        if not AuthManager.is_valid_gmail(email):
-            return False, "Provide an accurate Gmail account or invalid Gmail."
+    def create_user(username: str, password: str) -> tuple[bool, str]:
+        """Create a new user account (simplified without email)"""
+        if len(username) < 3:
+            return False, "Username must be at least 3 characters long."
         
         conn = sqlite3.connect('technova.db')
         cursor = conn.cursor()
         
         try:
             # Check if user already exists
-            cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+            cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
             if cursor.fetchone():
-                return False, "An account with this email already exists."
-            
-            # Generate verification code
-            verification_code = AuthManager.generate_verification_code()
-            expires_at = datetime.now() + timedelta(minutes=10)
+                return False, "Username already exists."
             
             # Hash password
             password_hash = AuthManager.hash_password(password)
             
-            # Create user
+            # Create user with 14-day trial
             cursor.execute('''
-                INSERT INTO users (email, password_hash, verification_code, verification_expires, subscription_expires)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (email, password_hash, verification_code, expires_at, datetime.now() + timedelta(days=14)))
+                INSERT INTO users (username, password_hash, subscription_expires)
+                VALUES (?, ?, ?)
+            ''', (username, password_hash, datetime.now() + timedelta(days=14)))
             
             conn.commit()
-            
-            # Send verification email
-            if AuthManager.send_verification_email(email, verification_code):
-                return True, "Account created! Please check your Gmail for verification code."
-            else:
-                return False, "Account created but failed to send verification email."
+            return True, "Account created successfully! You have a 14-day free trial."
                 
         except Exception as e:
             return False, f"Error creating account: {str(e)}"
@@ -5082,67 +5003,25 @@ class AuthManager:
             conn.close()
     
     @staticmethod
-    def verify_user(email: str, verification_code: str) -> tuple[bool, str]:
-        """Verify user with verification code"""
-        conn = sqlite3.connect('technova.db')
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute('''
-                SELECT id, verification_code, verification_expires 
-                FROM users WHERE email = ? AND is_verified = FALSE
-            ''', (email,))
-            
-            result = cursor.fetchone()
-            if not result:
-                return False, "User not found or already verified."
-            
-            user_id, stored_code, expires_at = result
-            expires_at = datetime.fromisoformat(expires_at)
-            
-            if datetime.now() > expires_at:
-                return False, "Verification code expired. Please request a new one."
-            
-            if stored_code != verification_code:
-                return False, "Invalid verification code."
-            
-            # Mark user as verified
-            cursor.execute('''
-                UPDATE users SET is_verified = TRUE, verification_code = NULL, verification_expires = NULL
-                WHERE id = ?
-            ''', (user_id,))
-            
-            conn.commit()
-            return True, "Account verified successfully!"
-            
-        except Exception as e:
-            return False, f"Verification error: {str(e)}"
-        finally:
-            conn.close()
-    
-    @staticmethod
-    def login_user(email: str, password: str) -> tuple[bool, str, dict]:
+    def login_user(username: str, password: str) -> tuple[bool, str, dict]:
         """Login user and return user info"""
         conn = sqlite3.connect('technova.db')
         cursor = conn.cursor()
         
         try:
             cursor.execute('''
-                SELECT id, password_hash, is_verified, subscription_type, subscription_expires 
-                FROM users WHERE email = ?
-            ''', (email,))
+                SELECT id, password_hash, subscription_type, subscription_expires 
+                FROM users WHERE username = ?
+            ''', (username,))
             
             result = cursor.fetchone()
             if not result:
-                return False, "Invalid email or password.", {}
+                return False, "Invalid username or password.", {}
             
-            user_id, password_hash, is_verified, sub_type, sub_expires = result
+            user_id, password_hash, sub_type, sub_expires = result
             
             if not AuthManager.verify_password(password, password_hash):
-                return False, "Invalid email or password.", {}
-            
-            if not is_verified:
-                return False, "Please verify your account first.", {}
+                return False, "Invalid username or password.", {}
             
             # Check subscription status
             if sub_expires:
@@ -5155,7 +5034,7 @@ class AuthManager:
             
             user_info = {
                 'id': user_id,
-                'email': email,
+                'username': username,
                 'subscription_type': sub_type,
                 'subscription_expires': sub_expires
             }
@@ -5342,15 +5221,15 @@ def login_page():
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("🔐 Login")
             
-            email = st.text_input("Gmail Address", placeholder="your.email@gmail.com")
+            username = st.text_input("Username", placeholder="your_username")
             password = st.text_input("Password", type="password")
             
             col_login, col_signup = st.columns(2)
             
             with col_login:
                 if st.button("Login", use_container_width=True):
-                    if email and password:
-                        success, message, user_info = AuthManager.login_user(email, password)
+                    if username and password:
+                        success, message, user_info = AuthManager.login_user(username, password)
                         if success:
                             st.session_state.authenticated = True
                             st.session_state.user_info = user_info
@@ -5359,16 +5238,12 @@ def login_page():
                         else:
                             st.error(message)
                     else:
-                        st.error("Please enter both email and password.")
+                        st.error("Please enter both username and password.")
             
             with col_signup:
                 if st.button("Sign Up", use_container_width=True):
                     st.session_state.page = 'signup'
                     st.rerun()
-            
-            if st.button("Forgot Password?", use_container_width=True):
-                st.session_state.page = 'forgot_password'
-                st.rerun()
             
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -5382,60 +5257,24 @@ def signup_page():
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("📝 Create TechNova Account")
             
-            email = st.text_input("Gmail Address", placeholder="your.email@gmail.com")
+            username = st.text_input("Username", placeholder="choose_a_username")
             password = st.text_input("Password", type="password")
             confirm_password = st.text_input("Confirm Password", type="password")
+            
+            st.info("💡 Note: Email verification has been temporarily disabled. You'll get immediate access!")
             
             col_create, col_back = st.columns(2)
             
             with col_create:
                 if st.button("Create Account", use_container_width=True):
-                    if not email or not password or not confirm_password:
+                    if not username or not password or not confirm_password:
                         st.error("Please fill in all fields.")
                     elif password != confirm_password:
                         st.error("Passwords do not match.")
                     elif len(password) < 6:
                         st.error("Password must be at least 6 characters long.")
                     else:
-                        success, message = AuthManager.create_user(email, password)
-                        if success:
-                            st.success(message)
-                            st.session_state.page = 'verify'
-                            st.session_state.verification_email = email
-                            st.rerun()
-                        else:
-                            st.error(message)
-            
-            with col_back:
-                if st.button("Back to Login", use_container_width=True):
-                    st.session_state.page = 'login'
-                    st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-
-def verify_page():
-    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
-    
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-            st.subheader("✉️ Verify Your Account")
-            
-            st.info(f"A verification code has been sent to {st.session_state.get('verification_email', 'your email')}.")
-            
-            verification_code = st.text_input("Enter 6-digit verification code", max_chars=6)
-            
-            col_verify, col_back = st.columns(2)
-            
-            with col_verify:
-                if st.button("Verify", use_container_width=True):
-                    if verification_code and len(verification_code) == 6:
-                        success, message = AuthManager.verify_user(
-                            st.session_state.get('verification_email'), 
-                            verification_code
-                        )
+                        success, message = AuthManager.create_user(username, password)
                         if success:
                             st.success(message)
                             st.balloons()
@@ -5443,8 +5282,6 @@ def verify_page():
                             st.rerun()
                         else:
                             st.error(message)
-                    else:
-                        st.error("Please enter a valid 6-digit code.")
             
             with col_back:
                 if st.button("Back to Login", use_container_width=True):
@@ -5453,25 +5290,7 @@ def verify_page():
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-def forgot_password_page():
-    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
-    
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-            st.subheader("🔑 Reset Password")
-            
-            st.info("Password reset functionality will be implemented in the next update.")
-            
-            if st.button("Back to Login", use_container_width=True):
-                st.session_state.page = 'login'
-                st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-
-# Main Application Pages
+# Main Application Functions
 def show_subscription_info():
     """Display subscription information and usage stats"""
     user_info = st.session_state.user_info
@@ -5537,7 +5356,7 @@ def log_tab_usage(tab_name: str):
     user_id = st.session_state.user_info['id']
     UsageManager.log_usage(user_id, tab_name)
 
-# Copy button function (same as original)
+# Copy button function
 def copy_button(text: str, label: str = "Copy", key: str = None):
     """Fixed copy button using st.components.v1.html"""
     if text is None:
@@ -5627,7 +5446,7 @@ def download_button_enhanced(content: str, filename: str, label: str, mime_type:
     """
     components.html(download_html, height=60)
 
-# Stopwords and analysis functions (same as original)
+# Stopwords and analysis functions
 STOPWORDS = set([
     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into",
     "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
@@ -5677,3 +5496,174 @@ def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool 
     scored = []
     for idx, s in enumerate(sentences):
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+        score = sum(word_freq.get(w, 0) for w in words) / len(words) if words else 0
+        scored.append((score, idx, s))
+    
+    # Get top sentences
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_sentences = sorted(scored[:max_sentences], key=lambda x: x[1])
+    
+    if as_bullets:
+        return "\n".join(f"• {s[2]}" for s in top_sentences)
+    else:
+        return " ".join(s[2] for s in top_sentences)
+
+# Main page with demo functionality
+def main_page():
+    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+    
+    # User info and logout
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        st.markdown(f"**Welcome, {st.session_state.user_info['username']}!**")
+    with col3:
+        if st.button("Logout"):
+            st.session_state.authenticated = False
+            st.session_state.user_info = {}
+            st.session_state.page = 'login'
+            st.rerun()
+    
+    # Show subscription info
+    show_subscription_info()
+    
+    # Demo tabs (simplified version)
+    tab1, tab2, tab3 = st.tabs(["📝 Text Summarizer", "🔍 Web Scraper", "🤖 AI Chat"])
+    
+    with tab1:
+        st.header("📝 Advanced Text Summarizer")
+        
+        if not check_tab_access("Text Summarizer"):
+            return
+        
+        text_input = st.text_area("Paste your text here:", height=200)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            max_sentences = st.slider("Summary length (sentences)", 1, 10, 5)
+        with col2:
+            as_bullets = st.checkbox("Format as bullet points")
+        
+        if st.button("Generate Summary", type="primary"):
+            if text_input.strip():
+                log_tab_usage("Text Summarizer")
+                with st.spinner("Analyzing text..."):
+                    summary = summarize_text_advanced(text_input, max_sentences, as_bullets)
+                    st.subheader("📋 Summary")
+                    st.write(summary)
+                    copy_button(summary, "Copy Summary", "summary")
+            else:
+                st.error("Please enter some text to summarize.")
+    
+    with tab2:
+        st.header("🔍 Web Content Scraper")
+        
+        if not check_tab_access("Web Scraper"):
+            return
+        
+        url_input = st.text_input("Enter URL to scrape:")
+        
+        if st.button("Scrape Content", type="primary"):
+            if url_input.strip():
+                log_tab_usage("Web Scraper")
+                with st.spinner("Scraping content..."):
+                    try:
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                        response = requests.get(url_input, headers=headers, timeout=10)
+                        response.raise_for_status()
+                        
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        
+                        # Remove script and style elements
+                        for script in soup(["script", "style"]):
+                            script.decompose()
+                        
+                        # Extract text
+                        text = soup.get_text()
+                        lines = (line.strip() for line in text.splitlines())
+                        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                        text = ' '.join(chunk for chunk in chunks if chunk)
+                        
+                        if text:
+                            st.subheader("📄 Scraped Content")
+                            st.write(f"**URL:** {url_input}")
+                            st.write(f"**Content Length:** {len(text)} characters")
+                            
+                            # Show first 1000 characters
+                            preview = text[:1000] + "..." if len(text) > 1000 else text
+                            st.text_area("Content Preview:", preview, height=200)
+                            
+                            copy_button(text, "Copy Full Content", "scraped")
+                            
+                            # Option to summarize
+                            if st.button("Generate Summary of Scraped Content"):
+                                summary = summarize_text_advanced(text, 5, False)
+                                st.subheader("📋 Summary")
+                                st.write(summary)
+                                copy_button(summary, "Copy Summary", "scraped_summary")
+                        else:
+                            st.warning("No readable content found on this page.")
+                            
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error scraping URL: {str(e)}")
+                    except Exception as e:
+                        st.error(f"Unexpected error: {str(e)}")
+            else:
+                st.error("Please enter a valid URL.")
+    
+    with tab3:
+        st.header("🤖 AI Chat Assistant")
+        
+        if not check_tab_access("AI Chat"):
+            return
+        
+        if not OPENAI_API_KEY:
+            st.error("OpenAI API key not configured. Please contact administrator.")
+            return
+        
+        user_message = st.text_area("Ask me anything:", height=100)
+        
+        if st.button("Send Message", type="primary"):
+            if user_message.strip():
+                log_tab_usage("AI Chat")
+                with st.spinner("Thinking..."):
+                    try:
+                        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+                        response = client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "system", "content": "You are a helpful AI assistant. Provide clear, concise, and helpful responses."},
+                                {"role": "user", "content": user_message}
+                            ],
+                            max_tokens=500
+                        )
+                        
+                        ai_response = response.choices[0].message.content
+                        
+                        st.subheader("🤖 AI Response")
+                        st.write(ai_response)
+                        copy_button(ai_response, "Copy Response", "ai_response")
+                        
+                    except Exception as e:
+                        st.error(f"Error getting AI response: {str(e)}")
+            else:
+                st.error("Please enter a message.")
+
+# Main application logic
+def main():
+    """Main application function"""
+    
+    # Handle authentication flow
+    if not st.session_state.authenticated:
+        if st.session_state.page == 'login':
+            login_page()
+        elif st.session_state.page == 'signup':
+            signup_page()
+        return
+    
+    # Show main application
+    main_page()
+
+if __name__ == "__main__":
+    main()
