@@ -4873,8 +4873,6 @@
 
 
 
-
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4899,12 +4897,132 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+# Stripe integration
+try:
+    import stripe
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+
 # Page config
 st.set_page_config(
     page_title="TechNova AI Nexus",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Stripe Configuration
+def setup_stripe():
+    """Setup Stripe with test keys"""
+    if not STRIPE_AVAILABLE:
+        return False, None
+    
+    # Use test keys - replace with your actual test keys
+    stripe_publishable_key = os.getenv('STRIPE_PUBLISHABLE_KEY') or st.secrets.get('STRIPE_PUBLISHABLE_KEY', '')
+    stripe_secret_key = os.getenv('STRIPE_SECRET_KEY') or st.secrets.get('STRIPE_SECRET_KEY', '')
+    
+    if stripe_secret_key:
+        try:
+            stripe.api_key = stripe_secret_key
+            return True, stripe_publishable_key
+        except Exception as e:
+            st.error(f"Stripe setup error: {str(e)}")
+            return False, None
+    return False, None
+
+# Stripe Payment Handler
+class StripePaymentHandler:
+    @staticmethod
+    def create_checkout_session(price_id: str, customer_email: str = None, username: str = None):
+        """Create Stripe checkout session"""
+        try:
+            if not STRIPE_AVAILABLE:
+                return None, "Stripe not available"
+            
+            stripe_available, _ = setup_stripe()
+            if not stripe_available:
+                return None, "Stripe not configured"
+            
+            # Create checkout session
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=f"{st.secrets.get('BASE_URL', 'http://localhost:8501')}?session_id={{CHECKOUT_SESSION_ID}}&success=true",
+                cancel_url=f"{st.secrets.get('BASE_URL', 'http://localhost:8501')}?canceled=true",
+                client_reference_id=username,
+                customer_email=customer_email,
+                metadata={
+                    'username': username,
+                    'subscription_type': 'plus'
+                }
+            )
+            
+            return session.url, None
+            
+        except Exception as e:
+            return None, f"Payment session creation failed: {str(e)}"
+    
+    @staticmethod
+    def verify_payment(session_id: str) -> Tuple[bool, Dict]:
+        """Verify payment and update user subscription"""
+        try:
+            if not STRIPE_AVAILABLE:
+                return False, {}
+            
+            stripe_available, _ = setup_stripe()
+            if not stripe_available:
+                return False, {}
+            
+            session = stripe.checkout.Session.retrieve(session_id)
+            
+            if session.payment_status == 'paid':
+                username = session.metadata.get('username')
+                if username and username in st.session_state.db_users:
+                    # Update user subscription
+                    user = st.session_state.db_users[username]
+                    user['subscription_type'] = 'plus'
+                    
+                    # Determine subscription period based on price
+                    subscription = stripe.Subscription.retrieve(session.subscription)
+                    price = stripe.Price.retrieve(subscription.items.data[0].price.id)
+                    
+                    if price.recurring.interval == 'year':
+                        user['subscription_expires'] = datetime.now() + timedelta(days=365)
+                    else:  # monthly
+                        user['subscription_expires'] = datetime.now() + timedelta(days=30)
+                    
+                    user['stripe_customer_id'] = session.customer
+                    user['stripe_subscription_id'] = session.subscription
+                    
+                    return True, {
+                        'username': username,
+                        'subscription_type': 'plus',
+                        'payment_status': 'paid'
+                    }
+            
+            return False, {}
+            
+        except Exception as e:
+            st.error(f"Payment verification failed: {str(e)}")
+            return False, {}
+def setup_openai():
+    """Setup OpenAI client with fallback for missing keys"""
+    if not OPENAI_AVAILABLE:
+        return False, None
+    
+    api_key = os.getenv('OPENAI_API_KEY') or st.secrets.get('OPENAI_API_KEY', '')
+    if api_key:
+        try:
+            client = OpenAI(api_key=api_key)
+            return True, client
+        except Exception as e:
+            st.error(f"OpenAI setup error: {str(e)}")
+            return False, None
+    return False, None
 
 # OpenAI Configuration - Updated for v1.0+
 def setup_openai():
@@ -4922,7 +5040,7 @@ def setup_openai():
             return False, None
     return False, None
 
-# In-memory database simulation
+# In-memory database simulation with Stripe integration
 class InMemoryDB:
     def __init__(self):
         if 'db_users' not in st.session_state:
@@ -4939,12 +5057,22 @@ class InMemoryDB:
             'created_at': datetime.now(),
             'subscription_type': 'free',
             'subscription_expires': datetime.now() + timedelta(days=14),
-            'id': len(st.session_state.db_users) + 1
+            'id': len(st.session_state.db_users) + 1,
+            'stripe_customer_id': None,
+            'stripe_subscription_id': None
         }
         return True
     
     def get_user(self, username: str) -> Optional[Dict]:
         return st.session_state.db_users.get(username)
+    
+    def update_user_subscription(self, username: str, subscription_data: Dict) -> bool:
+        """Update user subscription after successful payment"""
+        if username in st.session_state.db_users:
+            user = st.session_state.db_users[username]
+            user.update(subscription_data)
+            return True
+        return False
     
     def log_usage(self, username: str, tab_name: str):
         today = datetime.now().date().isoformat()
@@ -5404,6 +5532,42 @@ def set_tech_styling():
         margin: 15px 0;
     }
     
+    .pricing-card {
+        background: rgba(0, 153, 204, 0.1);
+        border: 2px solid rgba(0, 153, 204, 0.4);
+        border-radius: 12px;
+        padding: 25px;
+        margin: 15px 0;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+        border-color: rgba(0, 153, 204, 0.6);
+        box-shadow: 0 6px 25px rgba(0, 153, 204, 0.2);
+        transform: translateY(-2px);
+    }
+    
+    .pricing-highlight {
+        background: rgba(0, 249, 255, 0.15);
+        border: 2px solid rgba(0, 249, 255, 0.5);
+        position: relative;
+    }
+    
+    .pricing-highlight::before {
+        content: "BEST VALUE";
+        position: absolute;
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(45deg, #00f9ff, #0099cc);
+        color: #000;
+        padding: 5px 15px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    
     .metric-card {
         background: rgba(0, 20, 40, 0.8);
         border: 1px solid rgba(0, 249, 255, 0.3);
@@ -5705,6 +5869,252 @@ def analyze_text_metrics(text: str) -> Dict:
         st.error(f"Error analyzing text: {str(e)}")
         return {}
 
+# Pricing display functions with Stripe integration
+def show_pricing_cards(show_upgrade_buttons=False, username=None):
+    """Display pricing cards with updated pricing structure and optional upgrade buttons"""
+    st.markdown("### 💰 TechNova Plus Pricing")
+    
+    # Get Stripe configuration
+    stripe_available, stripe_pub_key = setup_stripe()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        <div class="pricing-card">
+            <h4>📅 Monthly Plan</h4>
+            <div style="font-size: 2.5rem; font-weight: bold; color: #00f9ff; margin: 15px 0;">
+                $8<span style="font-size: 1rem;">/month</span>
+            </div>
+            <ul style="text-align: left; margin: 20px 0;">
+                <li>♾️ Unlimited tool usage</li>
+                <li>🚀 Priority processing</li>
+                <li>🆕 Early feature access</li>
+                <li>📧 Premium support</li>
+                <li>🔄 Cancel anytime</li>
+            </ul>
+            <p style="color: rgba(0, 249, 255, 0.8); font-size: 0.9rem;">
+                Perfect for trying out premium features
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if show_upgrade_buttons:
+            if stripe_available:
+                if st.button("🚀 Upgrade to Monthly ($8/month)", use_container_width=True, key="monthly_upgrade"):
+                    handle_stripe_checkout("monthly", username)
+            else:
+                st.button("💳 Monthly Plan - Stripe Setup Required", disabled=True, use_container_width=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="pricing-card pricing-highlight">
+            <h4>🏆 Annual Plan</h4>
+            <div style="font-size: 2.5rem; font-weight: bold; color: #00f9ff; margin: 15px 0;">
+                $90<span style="font-size: 1rem;">/year</span>
+            </div>
+            <div style="background: rgba(0, 249, 255, 0.2); padding: 8px; border-radius: 6px; margin: 10px 0;">
+                <strong>💰 Save $6/year (6.25% off!)</strong>
+            </div>
+            <ul style="text-align: left; margin: 20px 0;">
+                <li>♾️ Unlimited tool usage</li>
+                <li>🚀 Priority processing</li>
+                <li>🆕 Early feature access</li>
+                <li>📧 Premium support</li>
+                <li>💎 Annual subscriber perks</li>
+            </ul>
+            <p style="color: rgba(0, 249, 255, 0.8); font-size: 0.9rem;">
+                Best value for power users
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if show_upgrade_buttons:
+            if stripe_available:
+                if st.button("⭐ Upgrade to Annual ($90/year)", use_container_width=True, key="annual_upgrade"):
+                    handle_stripe_checkout("annual", username)
+            else:
+                st.button("💳 Annual Plan - Stripe Setup Required", disabled=True, use_container_width=True)
+    
+    if show_upgrade_buttons and not stripe_available:
+        st.warning("💳 Payment processing requires Stripe configuration. Please contact support for manual upgrade.")
+
+def handle_stripe_checkout(plan_type: str, username: str):
+    """Handle Stripe checkout process"""
+    try:
+        # Price IDs - replace these with your actual Stripe Price IDs
+        price_ids = {
+            'monthly': os.getenv('STRIPE_MONTHLY_PRICE_ID') or st.secrets.get('STRIPE_MONTHLY_PRICE_ID', 'price_1234567890'),  # Replace with your monthly price ID
+            'annual': os.getenv('STRIPE_ANNUAL_PRICE_ID') or st.secrets.get('STRIPE_ANNUAL_PRICE_ID', 'price_0987654321')   # Replace with your annual price ID
+        }
+        
+        price_id = price_ids.get(plan_type)
+        if not price_id:
+            st.error("Pricing configuration error. Please contact support.")
+            return
+        
+        # Create checkout session
+        checkout_url, error = StripePaymentHandler.create_checkout_session(
+            price_id=price_id,
+            username=username
+        )
+        
+        if checkout_url:
+            # Redirect to Stripe Checkout
+            st.markdown(f"""
+            <script>
+                window.open('{checkout_url}', '_blank');
+            </script>
+            """, unsafe_allow_html=True)
+            
+            st.success(f"🚀 Redirecting to secure payment for {plan_type} plan...")
+            st.info("💳 You'll be redirected to Stripe's secure payment page. Complete your payment there and return here.")
+            
+        else:
+            st.error(f"Payment setup failed: {error}")
+            
+    except Exception as e:
+        st.error(f"Checkout error: {str(e)}")
+
+def check_payment_success():
+    """Check for successful payment and update user subscription"""
+    # Get URL parameters
+    query_params = st.experimental_get_query_params()
+    
+    if 'session_id' in query_params and 'success' in query_params:
+        session_id = query_params['session_id'][0]
+        
+        with st.spinner("🔄 Verifying your payment..."):
+            success, payment_info = StripePaymentHandler.verify_payment(session_id)
+            
+            if success:
+                username = payment_info.get('username')
+                if username and username == st.session_state.user_info.get('username'):
+                    # Update session state
+                    st.session_state.user_info['subscription_type'] = 'plus'
+                    
+                    st.success("🎉 Payment successful! Welcome to TechNova Plus!")
+                    st.balloons()
+                    
+                    # Clear URL parameters
+                    st.experimental_set_query_params()
+                    st.rerun()
+                else:
+                    st.error("Payment verification failed - user mismatch.")
+            else:
+                st.error("Payment verification failed. Please contact support if you were charged.")
+    
+    elif 'canceled' in query_params:
+        st.warning("Payment was canceled. You can try again anytime!")
+        # Clear URL parameters
+        st.experimental_set_query_params()
+def show_subscription_info():
+    user_info = st.session_state.user_info
+    sub_type = user_info.get('subscription_type', 'free')
+    username = user_info.get('username', '')
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        if sub_type == 'free':
+            sub_expires = user_info.get('subscription_expires')
+            if sub_expires:
+                days_left = max(0, (sub_expires - datetime.now()).days)
+                st.markdown(f"""
+                <div class="subscription-info">
+                    <span class="status-indicator status-warning"></span>
+                    <strong>🆓 Free Trial Active</strong><br>
+                    Days remaining: <strong>{days_left} days</strong><br>
+                    Daily limit: <strong>4 uses per tool</strong><br>
+                    <small>Upgrade to unlock unlimited usage!</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show upgrade button for free users
+                if st.button("⭐ Upgrade to TechNova Plus", type="primary"):
+                    st.session_state.show_upgrade_modal = True
+                    st.rerun()
+                    
+        elif sub_type == 'plus':
+            sub_expires = user_info.get('subscription_expires')
+            if sub_expires:
+                expires_str = sub_expires.strftime('%Y-%m-%d')
+                st.markdown(f"""
+                <div class="subscription-info">
+                    <span class="status-indicator status-online"></span>
+                    <strong>⭐ TechNova Plus Active</strong><br>
+                    Status: <strong>Premium Member</strong><br>
+                    Usage: <strong>Unlimited across all tools</strong><br>
+                    Renews: <strong>{expires_str}</strong><br>
+                    <small>Thank you for supporting TechNova!</small>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="subscription-info">
+                    <span class="status-indicator status-online"></span>
+                    <strong>⭐ TechNova Plus Active</strong><br>
+                    Status: <strong>Premium Member</strong><br>
+                    Usage: <strong>Unlimited across all tools</strong><br>
+                    <small>Thank you for supporting TechNova!</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        elif sub_type == 'expired':
+            st.markdown("""
+            <div class="usage-warning">
+                <span class="status-indicator status-offline"></span>
+                <strong>⚠️ Trial Expired</strong><br>
+                Your free trial has ended. Upgrade to continue using all features.<br>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Show upgrade options for expired users
+            if st.button("🚀 Reactivate with TechNova Plus", type="primary"):
+                st.session_state.show_upgrade_modal = True
+                st.rerun()
+    
+    with col2:
+        if sub_type == 'free':
+            usage_stats = UsageManager.get_usage_stats(username)
+            if usage_stats:
+                st.markdown("**📊 Today's Usage:**")
+                for tool, count in usage_stats.items():
+                    if count > 0:
+                        color = "#ff4444" if count >= 4 else "#00f9ff"
+                        st.markdown(f"<span style='color: {color};'>• {tool}: {count}/4</span>", unsafe_allow_html=True)
+
+# Upgrade modal
+def show_upgrade_modal():
+    """Display upgrade modal with Stripe integration"""
+    if st.session_state.get('show_upgrade_modal', False):
+        # Modal overlay
+        st.markdown("""
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0, 0, 0, 0.8); z-index: 999; display: flex; 
+                    align-items: center; justify-content: center;">
+            <div style="background: rgba(0, 20, 40, 0.95); border: 2px solid rgba(0, 249, 255, 0.5); 
+                        border-radius: 15px; padding: 30px; max-width: 600px; width: 90%;">
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### 🚀 Upgrade to TechNova Plus")
+        
+        username = st.session_state.user_info.get('username', '')
+        
+        # Show pricing with upgrade buttons
+        show_pricing_cards(show_upgrade_buttons=True, username=username)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("❌ Close", use_container_width=True):
+                st.session_state.show_upgrade_modal = False
+                st.rerun()
+        
+        with col2:
+            st.markdown("**💳 Secure payment powered by Stripe**")
+        
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
 # Authentication pages
 def login_page():
     st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
@@ -5808,6 +6218,10 @@ def login_page():
             </ul>
         </div>
         """, unsafe_allow_html=True)
+    
+    # Updated pricing display on login page
+    st.markdown("---")
+    show_pricing_cards()
 
 def signup_page():
     st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
@@ -5867,6 +6281,10 @@ def signup_page():
                     st.rerun()
             
             st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Show pricing on signup page
+    st.markdown("---")
+    show_pricing_cards()
 
 def show_subscription_info():
     user_info = st.session_state.user_info
@@ -5905,9 +6323,11 @@ def show_subscription_info():
                 <span class="status-indicator status-offline"></span>
                 <strong>⚠️ Trial Expired</strong><br>
                 Your free trial has ended. Upgrade to continue using all features.<br>
-                <strong>Monthly:</strong> $15/month | <strong>Annual:</strong> $150/year (30% off!)
             </div>
             """, unsafe_allow_html=True)
+            
+            # Show updated pricing when trial expired
+            show_pricing_cards()
     
     with col2:
         if sub_type == 'free':
@@ -5934,13 +6354,20 @@ def check_tab_access(tab_name: str) -> bool:
             - 🚀 Priority processing speed
             - 🆕 Early access to new features
             - 📧 Premium email support
-            
-            **💰 Pricing:**
-            - **Monthly**: $15/month
-            - **Annual**: $150/year (Save 30% - Best Value!)
-            
-            📞 Contact our support team to upgrade your account.
             """)
+            
+            # Updated pricing display with upgrade buttons
+            show_pricing_cards(show_upgrade_buttons=True, username=username)
+            
+        elif "Daily limit reached" in message:
+            st.markdown("""
+            ### ⚡ Unlock Unlimited Usage
+            
+            You've reached today's limit for this tool. Upgrade to TechNova Plus for unlimited access to all features!
+            """)
+            
+            show_pricing_cards(show_upgrade_buttons=True, username=username)
+            
         return False
     
     return True
@@ -6681,7 +7108,7 @@ Time: {chat['timestamp'].strftime('%H:%M:%S')}
 
 USER: {chat['user']}
 
-ASSISTANT: {chat['assistant']}
+AI: {chat['assistant']}
 
 {'='*50}
 """
@@ -6732,6 +7159,15 @@ ASSISTANT: {chat['assistant']}
 # Main application function
 def main():
     try:
+        # Check for payment success/cancellation first
+        if st.session_state.authenticated:
+            check_payment_success()
+        
+        # Show upgrade modal if requested
+        if st.session_state.get('show_upgrade_modal', False):
+            show_upgrade_modal()
+            return
+        
         if not st.session_state.authenticated:
             if st.session_state.page == 'login':
                 login_page()
@@ -6741,13 +7177,14 @@ def main():
         
         main_page()
         
-        # Enhanced footer
+        # Enhanced footer with pricing info
         st.markdown("---")
         st.markdown("""
         <div style="text-align: center; color: rgba(0, 249, 255, 0.6); margin: 2rem 0;">
             <p>🌌 <strong>TechNova AI Nexus v2.0</strong> - Next-Generation AI Tools for Developers</p>
             <p>Multi-Language Support • AI Enhancement • Smart Analysis • Seamless Integration</p>
             <p><small>Powered by OpenAI • Built with Streamlit • Designed for Innovation</small></p>
+            <p><small><strong>Pricing:</strong> Free Mode (14 days) • TechNova Plus ($8/month or $90/year) • Secure payments by Stripe</small></p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -6757,4 +7194,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
