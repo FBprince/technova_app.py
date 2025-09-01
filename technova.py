@@ -4871,8 +4871,6 @@
 
 
 
-
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4889,7 +4887,11 @@ import string
 from datetime import datetime, timedelta
 import os
 from typing import Optional, Dict, List, Tuple
-import openai
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 # Page config
 st.set_page_config(
@@ -4906,6 +4908,15 @@ def setup_openai():
         openai.api_key = api_key
         return True
     return False
+
+# Initialize OpenAI client for v1.0.0+
+def get_openai_client():
+    """Get OpenAI client for new API version"""
+    api_key = os.getenv('OPENAI_API_KEY') or st.secrets.get('OPENAI_API_KEY', '')
+    if api_key:
+        from openai import OpenAI
+        return OpenAI(api_key=api_key)
+    return None
 
 # In-memory database simulation
 class InMemoryDB:
@@ -5220,6 +5231,10 @@ class AITextProcessor:
             return AITextProcessor._mock_enhancement(text, enhancement_type)
         
         try:
+            client = get_openai_client()
+            if not client:
+                return AITextProcessor._mock_enhancement(text, enhancement_type)
+            
             prompts = {
                 'professional': "Rewrite this text in a professional, business-appropriate tone while maintaining the original meaning:",
                 'casual': "Rewrite this text in a casual, friendly tone while keeping the core message:",
@@ -5232,7 +5247,7 @@ class AITextProcessor:
             
             prompt = prompts.get(enhancement_type, prompts['grammar'])
             
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are a professional writing assistant."},
@@ -5275,6 +5290,10 @@ Note: This is a demo response. Enable OpenAI API for full AI-powered enhancement
             return AITextProcessor._mock_summary(text, style, sentences)
         
         try:
+            client = get_openai_client()
+            if not client:
+                return AITextProcessor._mock_summary(text, style, sentences)
+            
             style_prompts = {
                 'executive': f"Create an executive summary in {sentences} sentences focusing on key decisions and outcomes:",
                 'academic': f"Create an academic summary in {sentences} sentences with formal analysis:",
@@ -5284,7 +5303,7 @@ Note: This is a demo response. Enable OpenAI API for full AI-powered enhancement
             
             prompt = style_prompts.get(style, f"Summarize this text in {sentences} clear, concise sentences:")
             
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are an expert at creating clear, accurate summaries."},
@@ -5958,7 +5977,7 @@ def main_page():
     show_subscription_info()
     
     # Check AI API availability
-    ai_available = setup_openai()
+    ai_available = bool(get_openai_client())
     if not ai_available:
         st.warning("🤖 AI features running in demo mode. Configure OpenAI API key for full functionality.")
     
@@ -6097,17 +6116,21 @@ RECOMMENDATIONS:
                     copy_button(summary, "Copy Summary", "ai_summary")
             
             with col2:
-                if st.button("🔑 Extract Keywords", use_container_width=True):
+                                    if st.button("🔑 Extract Keywords", use_container_width=True):
                     if ai_available:
                         try:
-                            response = openai.ChatCompletion.create(
-                                model="gpt-3.5-turbo",
-                                messages=[{"role": "user", "content": f"Extract the 15 most important keywords and key phrases from this text, formatted as a comma-separated list:\n\n{content[:2000]}"}],
-                                max_tokens=200
-                            )
-                            keywords = response.choices[0].message.content.strip()
-                        except:
-                            keywords = ", ".join([word for word, count in metrics.get('top_words', [])[:15]])
+                            client = get_openai_client()
+                            if client:
+                                response = client.chat.completions.create(
+                                    model="gpt-3.5-turbo",
+                                    messages=[{"role": "user", "content": f"Extract the 15 most important keywords and key phrases from this text, formatted as a comma-separated list:\n\n{content[:2000]}"}],
+                                    max_tokens=200
+                                )
+                                keywords = response.choices[0].message.content.strip()
+                            else:
+                                keywords = ", ".join([word for word, count in metrics.get('top_words', [])[:15]])
+                        except Exception as e:
+                            keywords = f"Keyword extraction failed: {str(e)}"
                     else:
                         keywords = ", ".join([word for word, count in metrics.get('top_words', [])[:15]])
                     
@@ -6249,7 +6272,9 @@ RECOMMENDATIONS:
                     if ai_review and ai_available:
                         with st.spinner("🤖 AI is reviewing your code..."):
                             try:
-                                review_prompt = f"""Review this {detected_language} code and provide:
+                                client = get_openai_client()
+                                if client:
+                                    review_prompt = f"""Review this {detected_language} code and provide:
 1. Code quality assessment
 2. Potential improvements
 3. Best practice recommendations
@@ -6257,18 +6282,20 @@ RECOMMENDATIONS:
 
 Code:
 {code_content}"""
-                                
-                                response = openai.ChatCompletion.create(
-                                    model="gpt-3.5-turbo",
-                                    messages=[{"role": "user", "content": review_prompt}],
-                                    max_tokens=1000
-                                )
-                                
-                                ai_review_text = response.choices[0].message.content.strip()
-                                
-                                st.subheader("🤖 AI Code Review")
-                                st.markdown(ai_review_text)
-                                copy_button(ai_review_text, "Copy AI Review", "ai_review")
+                                    
+                                    response = client.chat.completions.create(
+                                        model="gpt-3.5-turbo",
+                                        messages=[{"role": "user", "content": review_prompt}],
+                                        max_tokens=1000
+                                    )
+                                    
+                                    ai_review_text = response.choices[0].message.content.strip()
+                                    
+                                    st.subheader("🤖 AI Code Review")
+                                    st.markdown(ai_review_text)
+                                    copy_button(ai_review_text, "Copy AI Review", "ai_review")
+                                else:
+                                    st.error("OpenAI client not available")
                                 
                             except Exception as e:
                                 st.error(f"AI review failed: {str(e)}")
@@ -6393,7 +6420,9 @@ CODE:
                             if ai_insights and ai_available:
                                 with st.spinner("🤖 Generating AI insights..."):
                                     try:
-                                        insight_prompt = f"""Analyze this website content and provide:
+                                        client = get_openai_client()
+                                        if client:
+                                            insight_prompt = f"""Analyze this website content and provide:
 1. Main topics and themes
 2. Content quality assessment
 3. Target audience identification
@@ -6402,18 +6431,20 @@ CODE:
 
 Website: {page_title}
 Content: {text[:1500]}"""
-                                        
-                                        response = openai.ChatCompletion.create(
-                                            model="gpt-3.5-turbo",
-                                            messages=[{"role": "user", "content": insight_prompt}],
-                                            max_tokens=800
-                                        )
-                                        
-                                        insights = response.choices[0].message.content.strip()
-                                        
-                                        st.subheader("🤖 AI Content Insights")
-                                        st.markdown(insights)
-                                        copy_button(insights, "Copy AI Insights", "web_insights")
+                                            
+                                            response = client.chat.completions.create(
+                                                model="gpt-3.5-turbo",
+                                                messages=[{"role": "user", "content": insight_prompt}],
+                                                max_tokens=800
+                                            )
+                                            
+                                            insights = response.choices[0].message.content.strip()
+                                            
+                                            st.subheader("🤖 AI Content Insights")
+                                            st.markdown(insights)
+                                            copy_button(insights, "Copy AI Insights", "web_insights")
+                                        else:
+                                            st.error("OpenAI client not available")
                                         
                                     except Exception as e:
                                         st.error(f"AI insights failed: {str(e)}")
@@ -6536,28 +6567,32 @@ TOP KEYWORDS:
                     with st.spinner("🤖 AI is processing your request..."):
                         if ai_available:
                             try:
-                                # Create context-aware prompt based on assistant type
-                                system_prompts = {
-                                    "Code Expert": "You are an expert programmer with deep knowledge of multiple programming languages. Provide detailed, actionable code advice.",
-                                    "Writing Coach": "You are a professional writing coach. Help improve clarity, style, and effectiveness of written communication.",
-                                    "Data Analyst": "You are a data analysis expert. Help with data interpretation, statistical analysis, and insights generation.",
-                                    "Web Developer": "You are a senior web developer. Provide guidance on modern web development practices and technologies.",
-                                    "Technical Writer": "You are a technical writing specialist. Help create clear, comprehensive technical documentation.",
-                                    "General Assistant": "You are a helpful AI assistant with broad knowledge across multiple domains."
-                                }
-                                
-                                system_prompt = system_prompts.get(assistant_type, system_prompts["General Assistant"])
-                                
-                                response = openai.ChatCompletion.create(
-                                    model="gpt-3.5-turbo",
-                                    messages=[
-                                        {"role": "system", "content": system_prompt},
-                                        {"role": "user", "content": user_message}
-                                    ],
-                                    max_tokens=1200
-                                )
-                                
-                                ai_response = response.choices[0].message.content.strip()
+                                client = get_openai_client()
+                                if client:
+                                    # Create context-aware prompt based on assistant type
+                                    system_prompts = {
+                                        "Code Expert": "You are an expert programmer with deep knowledge of multiple programming languages. Provide detailed, actionable code advice.",
+                                        "Writing Coach": "You are a professional writing coach. Help improve clarity, style, and effectiveness of written communication.",
+                                        "Data Analyst": "You are a data analysis expert. Help with data interpretation, statistical analysis, and insights generation.",
+                                        "Web Developer": "You are a senior web developer. Provide guidance on modern web development practices and technologies.",
+                                        "Technical Writer": "You are a technical writing specialist. Help create clear, comprehensive technical documentation.",
+                                        "General Assistant": "You are a helpful AI assistant with broad knowledge across multiple domains."
+                                    }
+                                    
+                                    system_prompt = system_prompts.get(assistant_type, system_prompts["General Assistant"])
+                                    
+                                    response = client.chat.completions.create(
+                                        model="gpt-3.5-turbo",
+                                        messages=[
+                                            {"role": "system", "content": system_prompt},
+                                            {"role": "user", "content": user_message}
+                                        ],
+                                        max_tokens=1200
+                                    )
+                                    
+                                    ai_response = response.choices[0].message.content.strip()
+                                else:
+                                    ai_response = "AI assistant unavailable - OpenAI client not configured."
                                 
                             except Exception as e:
                                 ai_response = f"AI response failed: {str(e)}. Running in demo mode."
@@ -6742,4 +6777,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
