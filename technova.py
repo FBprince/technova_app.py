@@ -4871,8 +4871,6 @@
 
 
 
-
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4886,9 +4884,6 @@ import json
 from typing import Optional, Dict, List
 import sqlite3
 import hashlib
-import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
 import random
 import string
 from datetime import datetime, timedelta
@@ -4896,11 +4891,19 @@ import os
 
 # Safe imports with error handling
 try:
+    import smtplib
+    from email.mime.text import MimeText
+    from email.mime.multipart import MimeMultipart
+    EMAIL_AVAILABLE = True
+except ImportError:
+    EMAIL_AVAILABLE = False
+    st.warning("Email functionality not available in this environment.")
+
+try:
     import bcrypt
     BCRYPT_AVAILABLE = True
 except ImportError:
     BCRYPT_AVAILABLE = False
-    st.warning("bcrypt not available. Using hashlib for password hashing.")
 
 try:
     import openai
@@ -4934,7 +4937,6 @@ def load_secrets():
             'STRIPE_SECRET_KEY': st.secrets.get("STRIPE_SECRET_KEY", "")
         }
     except Exception as e:
-        st.error(f"Error loading secrets: {e}")
         return {
             'OPENAI_API_KEY': "",
             'SMTP_SERVER': "smtp.gmail.com",
@@ -5011,6 +5013,8 @@ class AuthManager:
                 return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
             else:
                 # Fallback verification
+                if len(hashed) < 64:
+                    return False
                 salt = bytes.fromhex(hashed[:64])
                 stored_hash = hashed[64:]
                 pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
@@ -5032,6 +5036,10 @@ class AuthManager:
     @staticmethod
     def send_verification_email(email: str, verification_code: str) -> bool:
         """Send verification code via email"""
+        if not EMAIL_AVAILABLE:
+            st.error("Email functionality not available in this environment.")
+            return False
+            
         if not SECRETS['SMTP_USERNAME'] or not SECRETS['SMTP_PASSWORD']:
             st.error("Email service not configured. Please contact administrator.")
             return False
@@ -5080,6 +5088,7 @@ class AuthManager:
             # Check if user already exists
             cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
             if cursor.fetchone():
+                conn.close()
                 return False, "An account with this email already exists."
             
             # Generate verification code
@@ -5089,21 +5098,26 @@ class AuthManager:
             # Hash password
             password_hash = AuthManager.hash_password(password)
             
-            # Create user
+            # Create user - auto-verify if email not available
+            is_verified = not EMAIL_AVAILABLE
+            
             cursor.execute('''
-                INSERT INTO users (email, password_hash, verification_code, verification_expires, subscription_expires)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO users (email, password_hash, verification_code, verification_expires, subscription_expires, is_verified)
+                VALUES (?, ?, ?, ?, ?, ?)
             ''', (email, password_hash, verification_code, expires_at.isoformat(), 
-                  (datetime.now() + timedelta(days=14)).isoformat()))
+                  (datetime.now() + timedelta(days=14)).isoformat(), is_verified))
             
             conn.commit()
             conn.close()
             
-            # Send verification email
-            if AuthManager.send_verification_email(email, verification_code):
-                return True, "Account created! Please check your Gmail for verification code."
+            if EMAIL_AVAILABLE:
+                # Send verification email
+                if AuthManager.send_verification_email(email, verification_code):
+                    return True, "Account created! Please check your Gmail for verification code."
+                else:
+                    return True, "Account created but failed to send verification email. Contact support."
             else:
-                return False, "Account created but failed to send verification email."
+                return True, "Account created and automatically verified! You can now log in."
                 
         except Exception as e:
             return False, f"Error creating account: {str(e)}"
@@ -5122,15 +5136,18 @@ class AuthManager:
             
             result = cursor.fetchone()
             if not result:
+                conn.close()
                 return False, "User not found or already verified."
             
             user_id, stored_code, expires_at = result
             expires_at = datetime.fromisoformat(expires_at)
             
             if datetime.now() > expires_at:
+                conn.close()
                 return False, "Verification code expired. Please request a new one."
             
             if stored_code != verification_code:
+                conn.close()
                 return False, "Invalid verification code."
             
             # Mark user as verified
@@ -5160,14 +5177,17 @@ class AuthManager:
             
             result = cursor.fetchone()
             if not result:
+                conn.close()
                 return False, "Invalid email or password.", {}
             
             user_id, password_hash, is_verified, sub_type, sub_expires = result
             
             if not AuthManager.verify_password(password, password_hash):
+                conn.close()
                 return False, "Invalid email or password.", {}
             
             if not is_verified:
+                conn.close()
                 return False, "Please verify your account first.", {}
             
             # Check subscription status
@@ -5208,16 +5228,19 @@ class UsageManager:
             cursor.execute("SELECT subscription_type FROM users WHERE id = ?", (user_id,))
             result = cursor.fetchone()
             if not result:
+                conn.close()
                 return False, "User not found."
             
             sub_type = result[0]
             
             # If TechNova Plus, allow unlimited usage
             if sub_type == 'plus':
+                conn.close()
                 return True, ""
             
             # If expired, deny access
             if sub_type == 'expired':
+                conn.close()
                 return False, "Your free trial has expired. Please upgrade to TechNova Plus."
             
             # Check daily usage for free users
@@ -5368,6 +5391,9 @@ def login_page():
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("🔐 Login")
             
+            if not EMAIL_AVAILABLE:
+                st.info("Running in demo mode - email verification disabled")
+            
             email = st.text_input("Gmail Address", placeholder="your.email@gmail.com")
             password = st.text_input("Password", type="password")
             
@@ -5392,10 +5418,6 @@ def login_page():
                     st.session_state.page = 'signup'
                     st.rerun()
             
-            if st.button("Forgot Password?", use_container_width=True):
-                st.session_state.page = 'forgot_password'
-                st.rerun()
-            
             st.markdown('</div>', unsafe_allow_html=True)
 
 def signup_page():
@@ -5407,6 +5429,9 @@ def signup_page():
         with col2:
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("📝 Create TechNova Account")
+            
+            if not EMAIL_AVAILABLE:
+                st.info("Running in demo mode - accounts will be auto-verified")
             
             email = st.text_input("Gmail Address", placeholder="your.email@gmail.com")
             password = st.text_input("Password", type="password")
@@ -5426,8 +5451,11 @@ def signup_page():
                         success, message = AuthManager.create_user(email, password)
                         if success:
                             st.success(message)
-                            st.session_state.page = 'verify'
-                            st.session_state.verification_email = email
+                            if EMAIL_AVAILABLE:
+                                st.session_state.page = 'verify'
+                                st.session_state.verification_email = email
+                            else:
+                                st.session_state.page = 'login'
                             st.rerun()
                         else:
                             st.error(message)
@@ -5476,24 +5504,6 @@ def verify_page():
                 if st.button("Back to Login", use_container_width=True):
                     st.session_state.page = 'login'
                     st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-
-def forgot_password_page():
-    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
-    
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-            st.subheader("🔑 Reset Password")
-            
-            st.info("Password reset functionality will be implemented in the next update.")
-            
-            if st.button("Back to Login", use_container_width=True):
-                st.session_state.page = 'login'
-                st.rerun()
             
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -5571,7 +5581,7 @@ def copy_button(text: str, label: str = "Copy", key: str = None):
     
     import html
     escaped_text = html.escape(str(text))
-    button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(text[:50]))}"
+    button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(str(text)[:50]))}"
     
     copy_html = f"""
     <div style="margin: 10px 0;">
@@ -5669,101 +5679,117 @@ STOPWORDS = set([
 
 def safe_sentence_split(text: str):
     """Split text into sentences safely"""
-    pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
-    return [s.strip() for s in pattern.split(text) if s.strip()]
+    try:
+        pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+        return [s.strip() for s in pattern.split(text) if s.strip()]
+    except Exception:
+        return [text]
 
 def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool = False) -> str:
     """Advanced text summarization using frequency analysis"""
     if not text or not text.strip():
         return "No content to summarize."
     
-    paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
-    sentences = []
-    for para in paragraphs:
-        sentences.extend(safe_sentence_split(para))
+    try:
+        paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
+        sentences = []
+        for para in paragraphs:
+            sentences.extend(safe_sentence_split(para))
+        
+        if not sentences:
+            return text
+        
+        # Word frequency analysis
+        word_freq = Counter()
+        for s in sentences:
+            words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+            for w in words:
+                if w not in STOPWORDS and len(w) > 2:
+                    word_freq[w] += 1
+        
+        if not word_freq:
+            return " ".join(sentences[:max_sentences])
+        
+        # Normalize frequencies
+        max_freq = max(word_freq.values())
+        for w in list(word_freq.keys()):
+            word_freq[w] /= max_freq
+        
+        # Score sentences
+        scored = []
+        for idx, s in enumerate(sentences):
+            words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
+            score = sum(word_freq.get(w, 0) for w in words if w not in STOPWORDS)
+            scored.append((score, idx, s))
+        
+        # Sort by score and select top sentences
+        scored.sort(key=lambda x: x[0], reverse=True)
+        selected = sorted(scored[:max_sentences], key=lambda x: x[1])
+        
+        result_sentences = [s[2] for s in selected]
+        
+        if as_bullets:
+            return "\n".join(f"• {s}" for s in result_sentences)
+        else:
+            return " ".join(result_sentences)
     
-    if not sentences:
-        return text
-    
-    # Word frequency analysis
-    word_freq = Counter()
-    for s in sentences:
-        words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
-        for w in words:
-            if w not in STOPWORDS and len(w) > 2:
-                word_freq[w] += 1
-    
-    if not word_freq:
-        return " ".join(sentences[:max_sentences])
-    
-    # Normalize frequencies
-    max_freq = max(word_freq.values())
-    for w in list(word_freq.keys()):
-        word_freq[w] /= max_freq
-    
-    # Score sentences
-    scored = []
-    for idx, s in enumerate(sentences):
-        words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
-        score = sum(word_freq.get(w, 0) for w in words if w not in STOPWORDS)
-        scored.append((score, idx, s))
-    
-    # Sort by score and select top sentences
-    scored.sort(key=lambda x: x[0], reverse=True)
-    selected = sorted(scored[:max_sentences], key=lambda x: x[1])
-    
-    result_sentences = [s[2] for s in selected]
-    
-    if as_bullets:
-        return "\n".join(f"• {s}" for s in result_sentences)
-    else:
-        return " ".join(result_sentences)
+    except Exception as e:
+        return f"Error in text summarization: {str(e)}"
 
 def extract_keywords(text: str, max_keywords: int = 10) -> list:
     """Extract keywords from text"""
     if not text or not text.strip():
         return []
     
-    words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", text)]
-    filtered_words = [w for w in words if w not in STOPWORDS and len(w) > 2]
-    
-    word_freq = Counter(filtered_words)
-    return [word for word, freq in word_freq.most_common(max_keywords)]
+    try:
+        words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", text)]
+        filtered_words = [w for w in words if w not in STOPWORDS and len(w) > 2]
+        
+        word_freq = Counter(filtered_words)
+        return [word for word, freq in word_freq.most_common(max_keywords)]
+    except Exception:
+        return []
 
 def analyze_text_readability(text: str) -> dict:
     """Analyze text readability"""
     if not text or not text.strip():
         return {"error": "No text to analyze"}
     
-    sentences = safe_sentence_split(text)
-    words = re.findall(r"[A-Za-z0-9_']+", text)
-    
-    if not sentences or not words:
-        return {"error": "Invalid text format"}
-    
-    avg_sentence_length = len(words) / len(sentences) if sentences else 0
-    avg_word_length = sum(len(w) for w in words) / len(words) if words else 0
-    
-    # Simple readability score (0-100)
-    readability = max(0, 100 - (avg_sentence_length * 1.5) - (avg_word_length * 5))
-    
-    complexity = "Easy" if readability > 80 else "Medium" if readability > 60 else "Hard"
-    
-    return {
-        "sentences": len(sentences),
-        "words": len(words),
-        "avg_sentence_length": round(avg_sentence_length, 1),
-        "avg_word_length": round(avg_word_length, 1),
-        "readability_score": round(readability, 1),
-        "complexity": complexity
-    }
+    try:
+        sentences = safe_sentence_split(text)
+        words = re.findall(r"[A-Za-z0-9_']+", text)
+        
+        if not sentences or not words:
+            return {"error": "Invalid text format"}
+        
+        avg_sentence_length = len(words) / len(sentences) if sentences else 0
+        avg_word_length = sum(len(w) for w in words) / len(words) if words else 0
+        
+        # Simple readability score (0-100)
+        readability = max(0, 100 - (avg_sentence_length * 1.5) - (avg_word_length * 5))
+        
+        complexity = "Easy" if readability > 80 else "Medium" if readability > 60 else "Hard"
+        
+        return {
+            "sentences": len(sentences),
+            "words": len(words),
+            "avg_sentence_length": round(avg_sentence_length, 1),
+            "avg_word_length": round(avg_word_length, 1),
+            "readability_score": round(readability, 1),
+            "complexity": complexity
+        }
+    except Exception as e:
+        return {"error": f"Analysis error: {str(e)}"}
 
 # Web Scraping Functions
 def scrape_website_content(url: str) -> tuple[bool, str, dict]:
     """Scrape website content safely"""
     try:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+            
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
         response = requests.get(url, headers=headers, timeout=10)
@@ -5772,7 +5798,7 @@ def scrape_website_content(url: str) -> tuple[bool, str, dict]:
         soup = BeautifulSoup(response.content, 'html.parser')
         
         # Remove script and style elements
-        for script in soup(["script", "style"]):
+        for script in soup(["script", "style", "nav", "footer", "header"]):
             script.decompose()
         
         # Extract text content
@@ -5781,9 +5807,13 @@ def scrape_website_content(url: str) -> tuple[bool, str, dict]:
         chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
         text = '\n'.join(chunk for chunk in chunks if chunk)
         
+        # Clean up extra whitespace
+        text = re.sub(r'\n\s*\n', '\n\n', text)
+        text = text.strip()
+        
         # Extract metadata
         metadata = {
-            'title': soup.title.string if soup.title else 'No title',
+            'title': soup.title.string.strip() if soup.title and soup.title.string else 'No title',
             'url': url,
             'word_count': len(text.split()),
             'char_count': len(text)
@@ -5852,7 +5882,7 @@ def main_application():
         if not check_tab_access("Text Summarizer"):
             return
         
-        text_input = st.text_area("Enter text to summarize:", height=200)
+        text_input = st.text_area("Enter text to summarize:", height=200, placeholder="Paste your text here...")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -5860,7 +5890,7 @@ def main_application():
         with col2:
             as_bullets = st.checkbox("Format as bullet points")
         
-        if st.button("🔄 Generate Summary"):
+        if st.button("🔄 Generate Summary", type="primary"):
             if text_input.strip():
                 log_tab_usage("Text Summarizer")
                 
@@ -5881,10 +5911,10 @@ def main_application():
         if not check_tab_access("Keyword Extractor"):
             return
         
-        text_input = st.text_area("Enter text to extract keywords:", height=200)
+        text_input = st.text_area("Enter text to extract keywords:", height=200, placeholder="Paste your text here...")
         max_keywords = st.slider("Maximum keywords:", 5, 20, 10)
         
-        if st.button("🔄 Extract Keywords"):
+        if st.button("🔄 Extract Keywords", type="primary"):
             if text_input.strip():
                 log_tab_usage("Keyword Extractor")
                 
@@ -5895,6 +5925,13 @@ def main_application():
                 if keywords:
                     keyword_text = ", ".join(keywords)
                     st.write(keyword_text)
+                    
+                    # Display as tags
+                    st.markdown("**Keywords as tags:**")
+                    cols = st.columns(min(len(keywords), 5))
+                    for i, keyword in enumerate(keywords):
+                        with cols[i % 5]:
+                            st.button(keyword, disabled=True)
                     
                     copy_button(keyword_text, "Copy Keywords", "keywords")
                     download_button_enhanced(keyword_text, "keywords.txt", "Download Keywords")
@@ -5909,9 +5946,9 @@ def main_application():
         if not check_tab_access("Text Analyzer"):
             return
         
-        text_input = st.text_area("Enter text to analyze:", height=200)
+        text_input = st.text_area("Enter text to analyze:", height=200, placeholder="Paste your text here...")
         
-        if st.button("🔄 Analyze Text"):
+        if st.button("🔄 Analyze Text", type="primary"):
             if text_input.strip():
                 log_tab_usage("Text Analyzer")
                 
@@ -5933,6 +5970,11 @@ def main_application():
                     with col3:
                         st.metric("Readability Score", f"{analysis['readability_score']}/100")
                         st.metric("Complexity", analysis['complexity'])
+                    
+                    # Progress bar for readability
+                    st.subheader("Readability Score")
+                    progress_color = "green" if analysis['readability_score'] > 70 else "orange" if analysis['readability_score'] > 40 else "red"
+                    st.progress(analysis['readability_score'] / 100)
                     
                     # Create analysis summary
                     analysis_text = f"""Text Analysis Results:
@@ -5958,7 +6000,13 @@ def main_application():
         
         url_input = st.text_input("Enter website URL:", placeholder="https://example.com")
         
-        if st.button("🔄 Scrape Content"):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            pass
+        with col2:
+            scrape_button = st.button("🔄 Scrape Content", type="primary")
+        
+        if scrape_button:
             if url_input.strip():
                 log_tab_usage("Web Scraper")
                 
@@ -5966,23 +6014,37 @@ def main_application():
                     success, content, metadata = scrape_website_content(url_input)
                 
                 if success:
-                    st.subheader("📄 Scraped Content:")
-                    st.write(f"**Title:** {metadata.get('title', 'N/A')}")
-                    st.write(f"**Word Count:** {metadata.get('word_count', 0)}")
-                    st.write(f"**Character Count:** {metadata.get('char_count', 0)}")
+                    st.subheader("📄 Website Information:")
                     
-                    # Show first 500 characters as preview
-                    st.text_area("Content Preview:", content[:500] + "..." if len(content) > 500 else content, height=200)
+                    info_col1, info_col2 = st.columns(2)
+                    with info_col1:
+                        st.write(f"**Title:** {metadata.get('title', 'N/A')}")
+                        st.write(f"**URL:** {metadata.get('url', 'N/A')}")
+                    with info_col2:
+                        st.write(f"**Word Count:** {metadata.get('word_count', 0)}")
+                        st.write(f"**Character Count:** {metadata.get('char_count', 0)}")
                     
-                    copy_button(content, "Copy Full Content", "scraped")
-                    download_button_enhanced(content, "scraped_content.txt", "Download Content")
+                    # Show content preview
+                    st.subheader("📖 Content Preview:")
+                    preview_text = content[:1000] + "..." if len(content) > 1000 else content
+                    st.text_area("Preview (first 1000 characters):", preview_text, height=150)
                     
-                    # Offer to summarize scraped content
-                    if st.button("📝 Summarize Scraped Content"):
-                        summary = summarize_text_advanced(content, 5, False)
-                        st.subheader("📋 Content Summary:")
-                        st.write(summary)
-                        copy_button(summary, "Copy Summary", "scraped_summary")
+                    # Action buttons
+                    button_col1, button_col2, button_col3 = st.columns(3)
+                    
+                    with button_col1:
+                        copy_button(content, "Copy Full Content", "scraped")
+                    
+                    with button_col2:
+                        download_button_enhanced(content, "scraped_content.txt", "Download Content")
+                    
+                    with button_col3:
+                        if st.button("📝 Summarize Content"):
+                            with st.spinner("Summarizing content..."):
+                                summary = summarize_text_advanced(content, 5, False)
+                            st.subheader("📋 Content Summary:")
+                            st.write(summary)
+                            copy_button(summary, "Copy Summary", "scraped_summary")
                 else:
                     st.error(content)
             else:
@@ -5997,9 +6059,14 @@ def main_application():
         if not OPENAI_AVAILABLE or not SECRETS['OPENAI_API_KEY']:
             st.warning("AI Assistant requires OpenAI API configuration.")
             st.info("Please configure your OpenAI API key in Streamlit secrets to use this feature.")
+            st.code("""
+# Add to your .streamlit/secrets.toml file:
+OPENAI_API_KEY = "your-api-key-here"
+            """)
             return
         
-        prompt_input = st.text_area("Enter your prompt for AI assistance:", height=150)
+        prompt_input = st.text_area("Enter your prompt for AI assistance:", height=150, 
+                                  placeholder="Ask me anything! I can help with writing, analysis, coding, explanations...")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -6007,7 +6074,7 @@ def main_application():
         with col2:
             max_tokens = st.slider("Max tokens:", 100, 2000, 1000)
         
-        if st.button("🤖 Get AI Response"):
+        if st.button("🤖 Get AI Response", type="primary"):
             if prompt_input.strip():
                 log_tab_usage("AI Assistant")
                 
@@ -6016,7 +6083,7 @@ def main_application():
                 
                 if success:
                     st.subheader("🤖 AI Response:")
-                    st.write(response)
+                    st.markdown(response)
                     
                     copy_button(response, "Copy Response", "ai_response")
                     download_button_enhanced(response, "ai_response.txt", "Download Response")
@@ -6028,17 +6095,24 @@ def main_application():
 # Main execution logic
 def main():
     """Main execution function"""
-    if not st.session_state.authenticated:
-        if st.session_state.page == 'login':
-            login_page()
-        elif st.session_state.page == 'signup':
-            signup_page()
-        elif st.session_state.page == 'verify':
-            verify_page()
-        elif st.session_state.page == 'forgot_password':
-            forgot_password_page()
-    else:
-        main_application()
+    try:
+        if not st.session_state.authenticated:
+            if st.session_state.page == 'login':
+                login_page()
+            elif st.session_state.page == 'signup':
+                signup_page()
+            elif st.session_state.page == 'verify':
+                verify_page()
+            else:
+                login_page()
+        else:
+            main_application()
+    except Exception as e:
+        st.error(f"Application error: {str(e)}")
+        if st.button("Reset Application"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
 
 # Run the application
 if __name__ == "__main__":
