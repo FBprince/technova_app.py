@@ -4871,6 +4871,9 @@
 
 
 
+
+
+
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4946,18 +4949,94 @@ def load_secrets():
 # Load secrets
 SECRETS = load_secrets()
 
+# Initialize OpenAI if available
+if OPENAI_AVAILABLE and SECRETS['OPENAI_API_KEY']:
+    openai.api_key = SECRETS['OPENAI_API_KEY']
+
 # Initialize Stripe if available
 if STRIPE_AVAILABLE and SECRETS['STRIPE_SECRET_KEY']:
     stripe.api_key = SECRETS['STRIPE_SECRET_KEY']
 
-# Database Setup
-def init_database():
-    """Initialize the SQLite database with error handling"""
+# Database Setup with Migration Support
+def get_db_version():
+    """Get current database version"""
+    try:
+        conn = sqlite3.connect('technova.db', timeout=10)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='db_version'")
+        if cursor.fetchone():
+            cursor.execute("SELECT version FROM db_version ORDER BY id DESC LIMIT 1")
+            result = cursor.fetchone()
+            version = result[0] if result else 0
+        else:
+            version = 0
+        conn.close()
+        return version
+    except Exception:
+        return 0
+
+def set_db_version(version):
+    """Set database version"""
+    try:
+        conn = sqlite3.connect('technova.db', timeout=10)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS db_version (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                version INTEGER NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute("INSERT INTO db_version (version) VALUES (?)", (version,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error setting database version: {e}")
+
+def migrate_database():
+    """Handle database migrations"""
+    current_version = get_db_version()
+    target_version = 2  # Current target version
+    
+    if current_version >= target_version:
+        return  # No migration needed
+    
     try:
         conn = sqlite3.connect('technova.db', timeout=10)
         cursor = conn.cursor()
         
-        # Users table (updated for username instead of email)
+        # Migration from version 0 to 1: Add Stripe columns
+        if current_version < 1:
+            # Check if columns already exist
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'stripe_customer_id' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
+            
+            if 'stripe_subscription_id' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT")
+            
+            conn.commit()
+            set_db_version(1)
+        
+        # Migration from version 1 to 2: Additional future migrations can go here
+        if current_version < 2:
+            # Future migrations
+            set_db_version(2)
+        
+        conn.close()
+        
+    except Exception as e:
+        st.error(f"Database migration error: {e}")
+
+def init_database():
+    """Initialize the SQLite database with error handling and migration support"""
+    try:
+        conn = sqlite3.connect('technova.db', timeout=10)
+        cursor = conn.cursor()
+        
+        # Users table (complete schema)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4986,6 +5065,10 @@ def init_database():
         
         conn.commit()
         conn.close()
+        
+        # Run migrations
+        migrate_database()
+        
     except Exception as e:
         st.error(f"Database initialization error: {e}")
 
@@ -5049,8 +5132,8 @@ class AuthManager:
             
             # Create user with 14-day free trial
             cursor.execute('''
-                INSERT INTO users (username, password_hash, subscription_expires)
-                VALUES (?, ?, ?)
+                INSERT INTO users (username, password_hash, subscription_expires, stripe_customer_id, stripe_subscription_id)
+                VALUES (?, ?, ?, NULL, NULL)
             ''', (username, password_hash, (datetime.now() + timedelta(days=14)).isoformat()))
             
             conn.commit()
@@ -5068,8 +5151,11 @@ class AuthManager:
             conn = sqlite3.connect('technova.db', timeout=10)
             cursor = conn.cursor()
             
+            # Use safe column access with COALESCE for potentially missing columns
             cursor.execute('''
-                SELECT id, password_hash, subscription_type, subscription_expires, stripe_customer_id, stripe_subscription_id
+                SELECT id, password_hash, subscription_type, subscription_expires, 
+                       COALESCE(stripe_customer_id, '') as stripe_customer_id,
+                       COALESCE(stripe_subscription_id, '') as stripe_subscription_id
                 FROM users WHERE username = ?
             ''', (username,))
             
@@ -5102,8 +5188,8 @@ class AuthManager:
                 'username': username,
                 'subscription_type': sub_type,
                 'subscription_expires': sub_expires_dt,
-                'stripe_customer_id': stripe_customer_id,
-                'stripe_subscription_id': stripe_subscription_id
+                'stripe_customer_id': stripe_customer_id or None,
+                'stripe_subscription_id': stripe_subscription_id or None
             }
             
             return True, "Login successful!", user_info
@@ -5138,7 +5224,7 @@ class PaymentManager:
             # Get or create Stripe customer
             conn = sqlite3.connect('technova.db', timeout=10)
             cursor = conn.cursor()
-            cursor.execute("SELECT stripe_customer_id FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT COALESCE(stripe_customer_id, '') FROM users WHERE id = ?", (user_id,))
             result = cursor.fetchone()
             
             customer_id = result[0] if result and result[0] else None
@@ -5380,6 +5466,23 @@ def set_tech_styling():
         color: #00f9ff !important;
         font-weight: bold !important;
     }
+    
+    .tab-content {
+        background: rgba(0, 20, 40, 0.3);
+        border: 1px solid rgba(0, 249, 255, 0.2);
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px 0;
+    }
+    
+    .result-box {
+        background: rgba(0, 20, 40, 0.6);
+        border: 1px solid rgba(0, 249, 255, 0.3);
+        border-radius: 5px;
+        padding: 15px;
+        margin: 10px 0;
+        white-space: pre-wrap;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -5593,204 +5696,70 @@ def copy_button(text: str, label: str = "Copy", key: str = None):
                        border: 1px solid rgba(0, 249, 255, 0.5);
                        color: #00f9ff;
                        padding: 8px 16px;
-                       border-radius: 4px;
+                       border-radius: 5px;
                        cursor: pointer;
                        font-weight: bold;">
             📋 {label}
         </button>
-        <span id="copy_status_{button_key}" style="margin-left: 10px; color: #00f9ff;"></span>
     </div>
-    <textarea id="copy_text_{button_key}" readonly 
-              style="width: 100%; height: 120px; 
-                     background: rgba(0, 20, 40, 0.8);
-                     border: 1px solid rgba(0, 249, 255, 0.3);
-                     color: #00f9ff;
-                     padding: 10px;
-                     border-radius: 4px;">{escaped_text}</textarea>
     
     <script>
     function copyToClipboard_{button_key}() {{
-        const textArea = document.getElementById('copy_text_{button_key}');
-        const statusSpan = document.getElementById('copy_status_{button_key}');
-        
-        if (navigator.clipboard && window.isSecureContext) {{
-            navigator.clipboard.writeText(textArea.value).then(() => {{
-                statusSpan.innerHTML = '✅ Copied!';
-                setTimeout(() => {{
-                    statusSpan.innerHTML = '';
-                }}, 2000);
-            }}).catch(() => {{
-                fallbackCopy();
-            }});
-        }} else {{
-            fallbackCopy();
-        }}
-        
-        function fallbackCopy() {{
-            textArea.select();
-            textArea.setSelectionRange(0, 99999);
-            try {{
-                document.execCommand('copy');
-                statusSpan.innerHTML = '✅ Copied!';
-                setTimeout(() => {{
-                    statusSpan.innerHTML = '';
-                }}, 2000);
-            }} catch (err) {{
-                statusSpan.innerHTML = '❌ Copy failed - please select text manually';
-            }}
-        }}
+        const text = `{escaped_text}`;
+        navigator.clipboard.writeText(text).then(function() {{
+            console.log('Text copied to clipboard');
+        }}).catch(function(err) {{
+            console.error('Could not copy text: ', err);
+        }});
     }}
     </script>
     """
     
-    components.html(copy_html, height=200)
+    components.html(copy_html, height=50)
 
-def download_button_enhanced(content: str, filename: str, label: str, mime_type: str = "text/plain"):
-    """Enhanced download button with error handling"""
+def extract_text_from_pdf(pdf_file):
+    """Extract text from uploaded PDF file"""
+    if not PDF_AVAILABLE:
+        return "PDF processing not available. Please install PyPDF2."
+    
     try:
-        b64_content = base64.b64encode(str(content).encode()).decode()
-        href = f'data:{mime_type};base64,{b64_content}'
-        
-        download_html = f"""
-        <a href="{href}" download="{filename}"
-           style="background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
-                  border: 1px solid rgba(0, 249, 255, 0.5);
-                  color: #00f9ff;
-                  padding: 8px 16px;
-                  text-decoration: none;
-                  border-radius: 4px;
-                  font-weight: bold;
-                  display: inline-block;">
-            💾 {label}
-        </a>
-        """
-        components.html(download_html, height=60)
+        reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        return text
     except Exception as e:
-        st.error(f"Download error: {e}")
+        return f"Error reading PDF: {str(e)}"
 
-# Text Analysis Functions
-STOPWORDS = set([
-    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into",
-    "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then",
-    "there", "these", "they", "this", "to", "was", "will", "with", "you", "your", "from",
-    "our", "we", "he", "she", "his", "her", "its", "were", "been", "being", "than",
-    "also", "can", "could", "should", "would", "may", "might", "have", "has", "had",
-    "do", "does", "did", "done", "just", "over", "under", "more", "most", "other",
-    "some", "any", "each", "many", "few", "those", "them", "which", "who", "whom",
-    "whose", "where", "when", "why", "how"
-])
-
-def safe_sentence_split(text: str):
-    """Split text into sentences safely"""
-    try:
-        pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
-        return [s.strip() for s in pattern.split(text) if s.strip()]
-    except Exception:
-        return [text]
-
-def summarize_text_advanced(text: str, max_sentences: int = 5, as_bullets: bool = False) -> str:
-    """Advanced text summarization using frequency analysis"""
-    if not text or not text.strip():
-        return "No content to summarize."
+def get_openai_response(prompt: str, system_prompt: str = "") -> str:
+    """Get response from OpenAI API"""
+    if not OPENAI_AVAILABLE or not SECRETS['OPENAI_API_KEY']:
+        return "OpenAI API not configured. Please add your API key to the secrets."
     
     try:
-        paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
-        sentences = []
-        for para in paragraphs:
-            sentences.extend(safe_sentence_split(para))
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
         
-        if not sentences:
-            return text
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=1500,
+            temperature=0.7
+        )
         
-        # Word frequency analysis
-        word_freq = Counter()
-        for s in sentences:
-            words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
-            for w in words:
-                if w not in STOPWORDS and len(w) > 2:
-                    word_freq[w] += 1
-        
-        if not word_freq:
-            return " ".join(sentences[:max_sentences])
-        
-        # Normalize frequencies
-        max_freq = max(word_freq.values())
-        for w in list(word_freq.keys()):
-            word_freq[w] /= max_freq
-        
-        # Score sentences
-        scored = []
-        for idx, s in enumerate(sentences):
-            words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", s)]
-            score = sum(word_freq.get(w, 0) for w in words if w not in STOPWORDS)
-            scored.append((score, idx, s))
-        
-        # Sort by score and select top sentences
-        scored.sort(key=lambda x: x[0], reverse=True)
-        selected = sorted(scored[:max_sentences], key=lambda x: x[1])
-        
-        result_sentences = [s[2] for s in selected]
-        
-        if as_bullets:
-            return "\n".join(f"• {s}" for s in result_sentences)
-        else:
-            return " ".join(result_sentences)
-    
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"Error in text summarization: {str(e)}"
+        return f"Error calling OpenAI API: {str(e)}"
 
-def extract_keywords(text: str, max_keywords: int = 10) -> list:
-    """Extract keywords from text"""
-    if not text or not text.strip():
-        return []
-    
+def scrape_website(url: str) -> str:
+    """Scrape text content from a website"""
     try:
-        words = [w.lower() for w in re.findall(r"[A-Za-z0-9_']+", text)]
-        filtered_words = [w for w in words if w not in STOPWORDS and len(w) > 2]
-        
-        word_freq = Counter(filtered_words)
-        return [word for word, freq in word_freq.most_common(max_keywords)]
-    except Exception:
-        return []
-
-def analyze_text_readability(text: str) -> dict:
-    """Analyze text readability"""
-    if not text or not text.strip():
-        return {"error": "No text to analyze"}
-    
-    try:
-        sentences = safe_sentence_split(text)
-        words = re.findall(r"[A-Za-z0-9_']+", text)
-        
-        if not sentences or not words:
-            return {"error": "Invalid text format"}
-        
-        avg_sentence_length = len(words) / len(sentences) if sentences else 0
-        avg_word_length = sum(len(w) for w in words) / len(words) if words else 0
-        
-        # Simple readability score (0-100)
-        readability = max(0, 100 - (avg_sentence_length * 1.5) - (avg_word_length * 5))
-        
-        complexity = "Easy" if readability > 80 else "Medium" if readability > 60 else "Hard"
-        
-        return {
-            "sentences": len(sentences),
-            "words": len(words),
-            "avg_sentence_length": round(avg_sentence_length, 1),
-            "avg_word_length": round(avg_word_length, 1),
-            "readability_score": round(readability, 1),
-            "complexity": complexity
-        }
-    except Exception as e:
-        return {"error": f"Analysis error: {str(e)}"}
-
-# Web Scraping Functions
-def scrape_website_content(url: str) -> tuple[bool, str, dict]:
-    """Scrape website content safely"""
-    try:
+        # Add protocol if missing
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-            
+        
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -5801,313 +5770,562 @@ def scrape_website_content(url: str) -> tuple[bool, str, dict]:
         soup = BeautifulSoup(response.content, 'html.parser')
         
         # Remove script and style elements
-        for script in soup(["script", "style", "nav", "footer", "header"]):
+        for script in soup(["script", "style"]):
             script.decompose()
         
-        # Extract text content
+        # Get text content
         text = soup.get_text()
+        
+        # Clean up text
         lines = (line.strip() for line in text.splitlines())
         chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = '\n'.join(chunk for chunk in chunks if chunk)
+        text = ' '.join(chunk for chunk in chunks if chunk)
         
-        # Clean up extra whitespace
-        text = re.sub(r'\n\s*\n', '\n\n', text)
-        text = text.strip()
+        return text[:5000]  # Limit to first 5000 characters
         
-        # Extract metadata
-        metadata = {
-            'title': soup.title.string.strip() if soup.title and soup.title.string else 'No title',
-            'url': url,
-            'word_count': len(text.split()),
-            'char_count': len(text)
-        }
-        
-        return True, text, metadata
-        
-    except requests.exceptions.RequestException as e:
-        return False, f"Request error: {str(e)}", {}
+    except requests.RequestException as e:
+        return f"Error scraping website: {str(e)}"
     except Exception as e:
-        return False, f"Scraping error: {str(e)}", {}
+        return f"Error processing website content: {str(e)}"
 
-# OpenAI Integration (if available)
-def call_openai_api(prompt: str, model: str = "gpt-3.5-turbo", max_tokens: int = 1000) -> tuple[bool, str]:
-    """Call OpenAI API if available and configured"""
-    if not OPENAI_AVAILABLE:
-        return False, "OpenAI library not available"
+# AI Tool Functions
+def text_summarizer_tab():
+    """Text Summarization Tool"""
+    st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+    st.subheader("📄 Text Summarizer")
+    st.write("Summarize long texts, articles, or documents into concise summaries.")
     
-    if not SECRETS['OPENAI_API_KEY']:
-        return False, "OpenAI API key not configured"
+    # Check access
+    if not check_tab_access("Text Summarizer"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
     
-    try:
-        openai.api_key = SECRETS['OPENAI_API_KEY']
-        
-        response = openai.ChatCompletion.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=0.7
-        )
-        
-        return True, response.choices[0].message.content.strip()
-        
-    except Exception as e:
-        return False, f"OpenAI API error: {str(e)}"
+    # Input options
+    input_method = st.radio("Choose input method:", ["Text Input", "Upload PDF", "Website URL"])
+    
+    text_to_summarize = ""
+    
+    if input_method == "Text Input":
+        text_to_summarize = st.text_area("Enter text to summarize:", height=200, 
+                                       placeholder="Paste your text here...")
+    
+    elif input_method == "Upload PDF":
+        uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+        if uploaded_file is not None:
+            with st.spinner("Extracting text from PDF..."):
+                text_to_summarize = extract_text_from_pdf(uploaded_file)
+                if text_to_summarize and not text_to_summarize.startswith("Error"):
+                    st.success(f"Extracted {len(text_to_summarize)} characters from PDF")
+                else:
+                    st.error(text_to_summarize)
+    
+    elif input_method == "Website URL":
+        url = st.text_input("Enter website URL:", placeholder="https://example.com/article")
+        if url and st.button("Fetch Content"):
+            with st.spinner("Scraping website content..."):
+                text_to_summarize = scrape_website(url)
+                if text_to_summarize and not text_to_summarize.startswith("Error"):
+                    st.success(f"Scraped {len(text_to_summarize)} characters from website")
+                    st.text_area("Scraped content preview:", text_to_summarize[:500] + "...", height=100)
+                else:
+                    st.error(text_to_summarize)
+    
+    # Summary options
+    col1, col2 = st.columns(2)
+    with col1:
+        summary_length = st.selectbox("Summary length:", ["Short", "Medium", "Long"])
+    with col2:
+        summary_style = st.selectbox("Summary style:", ["Bullet Points", "Paragraph", "Key Insights"])
+    
+    if st.button("Generate Summary", use_container_width=True) and text_to_summarize:
+        if len(text_to_summarize.strip()) < 100:
+            st.error("Please provide more text (at least 100 characters) for summarization.")
+        else:
+            with st.spinner("Generating summary..."):
+                length_map = {"Short": "in 2-3 sentences", "Medium": "in 1-2 paragraphs", "Long": "in 3-4 paragraphs"}
+                style_map = {
+                    "Bullet Points": "as bullet points highlighting key information",
+                    "Paragraph": "in well-structured paragraphs",
+                    "Key Insights": "focusing on key insights and main takeaways"
+                }
+                
+                prompt = f"Summarize the following text {length_map[summary_length]} {style_map[summary_style]}:\n\n{text_to_summarize}"
+                
+                summary = get_openai_response(prompt, "You are a helpful assistant specialized in creating clear, concise summaries.")
+                
+                if summary:
+                    log_tab_usage("Text Summarizer")
+                    st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                    st.write("**Summary:**")
+                    st.write(summary)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    copy_button(summary, "Copy Summary", "summary")
+                else:
+                    st.error("Failed to generate summary. Please try again.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Main Application Logic
-def main_application():
-    """Main application interface"""
-    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+def code_generator_tab():
+    """Code Generation Tool"""
+    st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+    st.subheader("💻 Code Generator")
+    st.write("Generate code snippets in various programming languages based on your requirements.")
     
-    # Sidebar with user info and logout
-    with st.sidebar:
-        st.subheader(f"Welcome, {st.session_state.user_info.get('username', 'User')}")
-        
-        show_subscription_info()
-        
-        if st.button("🚪 Logout"):
-            st.session_state.authenticated = False
-            st.session_state.user_info = {}
-            st.session_state.page = 'login'
-            st.rerun()
+    if not check_tab_access("Code Generator"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
     
-    # Main tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📝 Text Summarizer", 
-        "🔍 Keyword Extractor", 
-        "📊 Text Analyzer", 
-        "🌐 Web Scraper", 
-        "🤖 AI Assistant"
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        language = st.selectbox("Programming Language:", [
+            "Python", "JavaScript", "Java", "C++", "C#", "Go", "Rust", 
+            "PHP", "Ruby", "Swift", "Kotlin", "TypeScript", "HTML/CSS"
+        ])
+    
+    with col2:
+        code_type = st.selectbox("Code Type:", [
+            "Function", "Class", "Algorithm", "Web Component", "API Endpoint",
+            "Database Query", "Script", "Utility", "Data Structure"
+        ])
+    
+    description = st.text_area("Describe what you want the code to do:", 
+                              height=150, 
+                              placeholder="Example: Create a function that calculates the fibonacci sequence up to n terms")
+    
+    # Advanced options
+    with st.expander("Advanced Options"):
+        include_comments = st.checkbox("Include detailed comments", value=True)
+        include_examples = st.checkbox("Include usage examples", value=True)
+        code_style = st.selectbox("Code Style:", ["Standard", "Clean/Minimal", "Detailed/Verbose"])
+    
+    if st.button("Generate Code", use_container_width=True) and description:
+        with st.spinner("Generating code..."):
+            system_prompt = f"""You are an expert programmer. Generate clean, efficient, and well-structured {language} code.
+            Always include proper error handling where appropriate.
+            Code style preference: {code_style}
+            {"Include detailed comments explaining the code." if include_comments else "Include minimal comments."}
+            {"Include usage examples after the main code." if include_examples else ""}"""
+            
+            prompt = f"Generate a {code_type.lower()} in {language} that {description}"
+            
+            code = get_openai_response(prompt, system_prompt)
+            
+            if code:
+                log_tab_usage("Code Generator")
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.write(f"**Generated {language} Code:**")
+                st.code(code, language=language.lower())
+                st.markdown('</div>', unsafe_allow_html=True)
+                copy_button(code, "Copy Code", "code")
+            else:
+                st.error("Failed to generate code. Please try again.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def content_writer_tab():
+    """Content Writing Tool"""
+    st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+    st.subheader("✍️ Content Writer")
+    st.write("Create engaging content for blogs, social media, marketing, and more.")
+    
+    if not check_tab_access("Content Writer"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+    
+    content_type = st.selectbox("Content Type:", [
+        "Blog Post", "Social Media Post", "Product Description", "Email Newsletter",
+        "Press Release", "Article", "Advertisement Copy", "Website Copy", "Essay"
     ])
     
-    with tab1:
-        st.subheader("📝 Advanced Text Summarizer")
-        
-        if not check_tab_access("Text Summarizer"):
-            return
-        
-        text_input = st.text_area("Enter text to summarize:", height=200, placeholder="Paste your text here...")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            max_sentences = st.slider("Max sentences in summary:", 1, 10, 5)
-        with col2:
-            as_bullets = st.checkbox("Format as bullet points")
-        
-        if st.button("🔄 Generate Summary", type="primary"):
-            if text_input.strip():
-                log_tab_usage("Text Summarizer")
-                
-                with st.spinner("Generating summary..."):
-                    summary = summarize_text_advanced(text_input, max_sentences, as_bullets)
-                
-                st.subheader("📋 Summary:")
-                st.write(summary)
-                
-                copy_button(summary, "Copy Summary", "summary")
-                download_button_enhanced(summary, "summary.txt", "Download Summary")
-            else:
-                st.error("Please enter some text to summarize.")
+    col1, col2 = st.columns(2)
     
-    with tab2:
-        st.subheader("🔍 Keyword Extractor")
-        
-        if not check_tab_access("Keyword Extractor"):
-            return
-        
-        text_input = st.text_area("Enter text to extract keywords:", height=200, placeholder="Paste your text here...")
-        max_keywords = st.slider("Maximum keywords:", 5, 20, 10)
-        
-        if st.button("🔄 Extract Keywords", type="primary"):
-            if text_input.strip():
-                log_tab_usage("Keyword Extractor")
-                
-                with st.spinner("Extracting keywords..."):
-                    keywords = extract_keywords(text_input, max_keywords)
-                
-                st.subheader("🏷️ Keywords:")
-                if keywords:
-                    keyword_text = ", ".join(keywords)
-                    st.write(keyword_text)
-                    
-                    # Display as tags
-                    st.markdown("**Keywords as tags:**")
-                    cols = st.columns(min(len(keywords), 5))
-                    for i, keyword in enumerate(keywords):
-                        with cols[i % 5]:
-                            st.button(keyword, disabled=True)
-                    
-                    copy_button(keyword_text, "Copy Keywords", "keywords")
-                    download_button_enhanced(keyword_text, "keywords.txt", "Download Keywords")
-                else:
-                    st.info("No keywords found.")
-            else:
-                st.error("Please enter some text to analyze.")
+    with col1:
+        tone = st.selectbox("Tone:", [
+            "Professional", "Casual", "Friendly", "Formal", "Persuasive",
+            "Humorous", "Inspirational", "Technical", "Creative"
+        ])
     
-    with tab3:
-        st.subheader("📊 Text Readability Analyzer")
-        
-        if not check_tab_access("Text Analyzer"):
-            return
-        
-        text_input = st.text_area("Enter text to analyze:", height=200, placeholder="Paste your text here...")
-        
-        if st.button("🔄 Analyze Text", type="primary"):
-            if text_input.strip():
-                log_tab_usage("Text Analyzer")
-                
-                with st.spinner("Analyzing text..."):
-                    analysis = analyze_text_readability(text_input)
-                
-                if "error" not in analysis:
-                    st.subheader("📈 Analysis Results:")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Sentences", analysis['sentences'])
-                        st.metric("Words", analysis['words'])
-                    
-                    with col2:
-                        st.metric("Avg Sentence Length", f"{analysis['avg_sentence_length']} words")
-                        st.metric("Avg Word Length", f"{analysis['avg_word_length']} chars")
-                    
-                    with col3:
-                        st.metric("Readability Score", f"{analysis['readability_score']}/100")
-                        st.metric("Complexity", analysis['complexity'])
-                    
-                    # Progress bar for readability
-                    st.subheader("Readability Score")
-                    st.progress(analysis['readability_score'] / 100)
-                    
-                    # Create analysis summary
-                    analysis_text = f"""Text Analysis Results:
-- Sentences: {analysis['sentences']}
-- Words: {analysis['words']}
-- Average Sentence Length: {analysis['avg_sentence_length']} words
-- Average Word Length: {analysis['avg_word_length']} characters
-- Readability Score: {analysis['readability_score']}/100
-- Complexity Level: {analysis['complexity']}"""
-                    
-                    copy_button(analysis_text, "Copy Analysis", "analysis")
-                    download_button_enhanced(analysis_text, "text_analysis.txt", "Download Analysis")
-                else:
-                    st.error(analysis['error'])
-            else:
-                st.error("Please enter some text to analyze.")
+    with col2:
+        length = st.selectbox("Length:", [
+            "Short (100-200 words)", "Medium (300-500 words)", 
+            "Long (600-1000 words)", "Extended (1000+ words)"
+        ])
     
-    with tab4:
-        st.subheader("🌐 Web Content Scraper")
-        
-        if not check_tab_access("Web Scraper"):
-            return
-        
-        url_input = st.text_input("Enter website URL:", placeholder="https://example.com")
-        
-        if st.button("🔄 Scrape Content", type="primary"):
-            if url_input.strip():
-                log_tab_usage("Web Scraper")
-                
-                with st.spinner("Scraping website..."):
-                    success, content, metadata = scrape_website_content(url_input)
-                
-                if success:
-                    st.subheader("📄 Website Information:")
-                    
-                    info_col1, info_col2 = st.columns(2)
-                    with info_col1:
-                        st.write(f"**Title:** {metadata.get('title', 'N/A')}")
-                        st.write(f"**URL:** {metadata.get('url', 'N/A')}")
-                    with info_col2:
-                        st.write(f"**Word Count:** {metadata.get('word_count', 0)}")
-                        st.write(f"**Character Count:** {metadata.get('char_count', 0)}")
-                    
-                    # Show content preview
-                    st.subheader("📖 Content Preview:")
-                    preview_text = content[:1000] + "..." if len(content) > 1000 else content
-                    st.text_area("Preview (first 1000 characters):", preview_text, height=150)
-                    
-                    # Action buttons
-                    button_col1, button_col2, button_col3 = st.columns(3)
-                    
-                    with button_col1:
-                        copy_button(content, "Copy Full Content", "scraped")
-                    
-                    with button_col2:
-                        download_button_enhanced(content, "scraped_content.txt", "Download Content")
-                    
-                    with button_col3:
-                        if st.button("📝 Summarize Content"):
-                            with st.spinner("Summarizing content..."):
-                                summary = summarize_text_advanced(content, 5, False)
-                            st.subheader("📋 Content Summary:")
-                            st.write(summary)
-                            copy_button(summary, "Copy Summary", "scraped_summary")
-                else:
-                    st.error(content)
-            else:
-                st.error("Please enter a valid URL.")
+    topic = st.text_input("Topic/Subject:", placeholder="Enter the main topic or subject")
     
-    with tab5:
-        st.subheader("🤖 AI Assistant")
-        
-        if not check_tab_access("AI Assistant"):
-            return
-        
-        if not OPENAI_AVAILABLE or not SECRETS['OPENAI_API_KEY']:
-            st.warning("AI Assistant requires OpenAI API configuration.")
-            st.info("Please configure your OpenAI API key in Streamlit secrets to use this feature.")
-            st.code("""
-# Add to your .streamlit/secrets.toml file:
-OPENAI_API_KEY = "your-api-key-here"
-            """)
-            return
-        
-        prompt_input = st.text_area("Enter your prompt for AI assistance:", height=150, 
-                                  placeholder="Ask me anything! I can help with writing, analysis, coding, explanations...")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            model_choice = st.selectbox("Select Model:", ["gpt-3.5-turbo", "gpt-4"])
-        with col2:
-            max_tokens = st.slider("Max tokens:", 100, 2000, 1000)
-        
-        if st.button("🤖 Get AI Response", type="primary"):
-            if prompt_input.strip():
-                log_tab_usage("AI Assistant")
+    additional_details = st.text_area("Additional Details/Requirements:", 
+                                    height=100,
+                                    placeholder="Any specific points to cover, target audience, keywords, etc.")
+    
+    # Advanced options
+    with st.expander("Advanced Options"):
+        target_audience = st.text_input("Target Audience:", placeholder="e.g., young professionals, tech enthusiasts")
+        keywords = st.text_input("Keywords to Include:", placeholder="Comma-separated keywords")
+        call_to_action = st.text_input("Call to Action:", placeholder="What should readers do after reading?")
+    
+    if st.button("Generate Content", use_container_width=True) and topic:
+        with st.spinner("Creating content..."):
+            length_map = {
+                "Short (100-200 words)": "100-200 words",
+                "Medium (300-500 words)": "300-500 words", 
+                "Long (600-1000 words)": "600-1000 words",
+                "Extended (1000+ words)": "1000+ words"
+            }
+            
+            system_prompt = f"""You are a professional content writer specializing in creating engaging, high-quality content.
+            Write in a {tone.lower()} tone and make the content compelling and well-structured.
+            Always include proper headings, subheadings, and formatting where appropriate."""
+            
+            prompt_parts = [
+                f"Write a {content_type.lower()} about {topic}",
+                f"Length: {length_map[length]}",
+                f"Tone: {tone}"
+            ]
+            
+            if additional_details:
+                prompt_parts.append(f"Additional requirements: {additional_details}")
+            if target_audience:
+                prompt_parts.append(f"Target audience: {target_audience}")
+            if keywords:
+                prompt_parts.append(f"Include these keywords naturally: {keywords}")
+            if call_to_action:
+                prompt_parts.append(f"Include this call to action: {call_to_action}")
+            
+            prompt = "\n".join(prompt_parts)
+            
+            content = get_openai_response(prompt, system_prompt)
+            
+            if content:
+                log_tab_usage("Content Writer")
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.write(f"**Generated {content_type}:**")
+                st.markdown(content)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-                with st.spinner("Getting AI response..."):
-                    success, response = call_openai_api(prompt_input, model_choice, max_tokens)
+                # Word count
+                word_count = len(content.split())
+                st.info(f"Word count: {word_count}")
                 
-                if success:
-                    st.subheader("🤖 AI Response:")
-                    st.markdown(response)
-                    
-                    copy_button(response, "Copy Response", "ai_response")
-                    download_button_enhanced(response, "ai_response.txt", "Download Response")
-                else:
-                    st.error(response)
+                copy_button(content, "Copy Content", "content")
             else:
-                st.error("Please enter a prompt for the AI assistant.")
+                st.error("Failed to generate content. Please try again.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Main execution logic
-def main():
-    """Main execution function"""
-    try:
-        if not st.session_state.authenticated:
-            if st.session_state.page == 'login':
-                login_page()
-            elif st.session_state.page == 'signup':
-                signup_page()
+def data_analyzer_tab():
+    """Data Analysis Tool"""
+    st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+    st.subheader("📊 Data Analyzer")
+    st.write("Analyze data patterns, generate insights, and create simple visualizations.")
+    
+    if not check_tab_access("Data Analyzer"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+    
+    analysis_type = st.selectbox("Analysis Type:", [
+        "Statistical Summary", "Pattern Recognition", "Trend Analysis",
+        "Comparative Analysis", "Data Interpretation", "Insights Generation"
+    ])
+    
+    # Data input options
+    data_input_method = st.radio("Data Input Method:", ["Paste Data", "Upload CSV"])
+    
+    data_text = ""
+    
+    if data_input_method == "Paste Data":
+        data_text = st.text_area("Paste your data here:", 
+                                height=200,
+                                placeholder="Enter your data (CSV format, JSON, or any structured format)")
+    
+    elif data_input_method == "Upload CSV":
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        if uploaded_file is not None:
+            try:
+                df_preview = pd.read_csv(uploaded_file, nrows=5)
+                st.write("**Data Preview:**")
+                st.dataframe(df_preview)
+                
+                # Convert to string for analysis
+                full_df = pd.read_csv(uploaded_file)
+                data_text = full_df.to_string()
+            except Exception as e:
+                st.error(f"Error reading CSV: {e}")
+    
+    # Analysis options
+    with st.expander("Analysis Options"):
+        focus_areas = st.multiselect("Focus Areas:", [
+            "Trends", "Outliers", "Correlations", "Distributions", 
+            "Missing Data", "Key Metrics", "Comparisons", "Predictions"
+        ])
+        
+        specific_questions = st.text_area("Specific Questions:", 
+                                        placeholder="What specific insights are you looking for?")
+    
+    if st.button("Analyze Data", use_container_width=True) and data_text:
+        with st.spinner("Analyzing data..."):
+            system_prompt = """You are a data analyst expert. Analyze the provided data and provide clear, 
+            actionable insights. Include statistical observations, patterns, and recommendations where appropriate.
+            Format your response with clear sections and bullet points for readability."""
+            
+            prompt_parts = [
+                f"Perform a {analysis_type.lower()} on the following data:",
+                data_text[:3000],  # Limit data size
+            ]
+            
+            if focus_areas:
+                prompt_parts.append(f"Focus particularly on: {', '.join(focus_areas)}")
+            
+            if specific_questions:
+                prompt_parts.append(f"Address these specific questions: {specific_questions}")
+            
+            prompt_parts.append("Provide actionable insights and recommendations based on your analysis.")
+            
+            prompt = "\n\n".join(prompt_parts)
+            
+            analysis = get_openai_response(prompt, system_prompt)
+            
+            if analysis:
+                log_tab_usage("Data Analyzer")
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.write("**Data Analysis Results:**")
+                st.markdown(analysis)
+                st.markdown('</div>', unsafe_allow_html=True)
+                copy_button(analysis, "Copy Analysis", "analysis")
             else:
-                login_page()
-        else:
-            main_application()
-    except Exception as e:
-        st.error(f"Application error: {str(e)}")
-        if st.button("Reset Application"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
+                st.error("Failed to analyze data. Please try again.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def language_translator_tab():
+    """Language Translation Tool"""
+    st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+    st.subheader("🌍 Language Translator")
+    st.write("Translate text between different languages with context awareness.")
+    
+    if not check_tab_access("Language Translator"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+    
+    col1, col2 = st.columns(2)
+    
+    languages = [
+        "Spanish", "French", "German", "Italian", "Portuguese", "Russian",
+        "Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean",
+        "Arabic", "Hindi", "Dutch", "Swedish", "Norwegian", "Danish",
+        "Polish", "Turkish", "Greek", "Hebrew", "Thai", "Vietnamese"
+    ]
+    
+    with col1:
+        source_lang = st.selectbox("From Language:", ["Auto-detect"] + languages)
+    
+    with col2:
+        target_lang = st.selectbox("To Language:", languages)
+    
+    text_to_translate = st.text_area("Enter text to translate:", 
+                                   height=150,
+                                   placeholder="Type or paste the text you want to translate...")
+    
+    # Translation options
+    with st.expander("Translation Options"):
+        translation_style = st.selectbox("Translation Style:", [
+            "Standard", "Formal", "Casual", "Technical", "Literary"
+        ])
+        
+        preserve_formatting = st.checkbox("Preserve formatting", value=True)
+        include_pronunciation = st.checkbox("Include pronunciation guide (where applicable)")
+    
+    if st.button("Translate", use_container_width=True) and text_to_translate and target_lang:
+        with st.spinner("Translating..."):
+            system_prompt = f"""You are a professional translator with expertise in multiple languages.
+            Provide accurate, contextually appropriate translations.
+            Translation style: {translation_style}
+            {'Preserve original formatting and structure.' if preserve_formatting else 'Focus on natural flow in target language.'}
+            Always maintain the original meaning and tone."""
+            
+            source_lang_text = source_lang if source_lang != "Auto-detect" else "the source language (auto-detect)"
+            
+            prompt_parts = [
+                f"Translate the following text from {source_lang_text} to {target_lang}:",
+                text_to_translate
+            ]
+            
+            if include_pronunciation and target_lang in ["Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean", "Russian", "Arabic", "Hindi", "Thai"]:
+                prompt_parts.append(f"Also include pronunciation guide in Latin characters.")
+            
+            prompt = "\n\n".join(prompt_parts)
+            
+            translation = get_openai_response(prompt, system_prompt)
+            
+            if translation:
+                log_tab_usage("Language Translator")
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.write(f"**Translation ({target_lang}):**")
+                st.write(translation)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                copy_button(translation, "Copy Translation", "translation")
+                
+                # Character count info
+                char_count = len(text_to_translate)
+                st.info(f"Translated {char_count} characters")
+            else:
+                st.error("Failed to translate text. Please try again.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def email_generator_tab():
+    """Email Generation Tool"""
+    st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+    st.subheader("📧 Email Generator")
+    st.write("Generate professional emails for various purposes and situations.")
+    
+    if not check_tab_access("Email Generator"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+    
+    email_type = st.selectbox("Email Type:", [
+        "Business Inquiry", "Follow-up", "Thank You", "Apology", "Request",
+        "Introduction", "Resignation", "Complaint", "Invitation", "Newsletter",
+        "Sales Pitch", "Meeting Request", "Feedback Request", "Custom"
+    ])
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        tone = st.selectbox("Tone:", [
+            "Professional", "Formal", "Friendly", "Casual", "Persuasive",
+            "Apologetic", "Enthusiastic", "Diplomatic"
+        ])
+    
+    with col2:
+        urgency = st.selectbox("Urgency Level:", [
+            "Low", "Normal", "High", "Urgent"
+        ])
+    
+    # Email details
+    recipient = st.text_input("Recipient Name:", placeholder="John Smith")
+    subject_hint = st.text_input("Subject Line Hint:", placeholder="What is the email about?")
+    
+    main_purpose = st.text_area("Main Purpose/Content:", 
+                               height=120,
+                               placeholder="Describe the main purpose of the email and key points to cover...")
+    
+    # Additional options
+    with st.expander("Additional Options"):
+        sender_name = st.text_input("Your Name:", placeholder="Your name for signature")
+        company = st.text_input("Company/Organization:", placeholder="Optional")
+        include_call_to_action = st.checkbox("Include call to action", value=True)
+        email_length = st.selectbox("Email Length:", ["Short", "Medium", "Long"])
+    
+    if st.button("Generate Email", use_container_width=True) and main_purpose:
+        with st.spinner("Generating email..."):
+            system_prompt = f"""You are a professional email writing assistant. Generate well-structured, 
+            appropriate emails with proper formatting, subject lines, and signatures.
+            Tone: {tone}
+            Urgency: {urgency}
+            Always include a subject line, greeting, body, and professional closing."""
+            
+            prompt_parts = [
+                f"Generate a {email_type.lower()} email with the following details:",
+                f"Purpose: {main_purpose}"
+            ]
+            
+            if recipient:
+                prompt_parts.append(f"Recipient: {recipient}")
+            if subject_hint:
+                prompt_parts.append(f"Subject should relate to: {subject_hint}")
+            if sender_name:
+                prompt_parts.append(f"Sender name: {sender_name}")
+            if company:
+                prompt_parts.append(f"Company/Organization: {company}")
+            
+            length_instructions = {
+                "Short": "Keep it concise and to the point",
+                "Medium": "Provide adequate detail and context", 
+                "Long": "Include comprehensive details and background"
+            }
+            prompt_parts.append(length_instructions[email_length])
+            
+            if include_call_to_action:
+                prompt_parts.append("Include an appropriate call to action")
+            
+            prompt = "\n".join(prompt_parts)
+            
+            email = get_openai_response(prompt, system_prompt)
+            
+            if email:
+                log_tab_usage("Email Generator")
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.write("**Generated Email:**")
+                st.text(email)
+                st.markdown('</div>', unsafe_allow_html=True)
+                copy_button(email, "Copy Email", "email")
+            else:
+                st.error("Failed to generate email. Please try again.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Main Application Logic
+def main_app():
+    """Main application with tabs"""
+    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+    
+    # User info and logout
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        st.write(f"**Welcome, {st.session_state.user_info['username']}!**")
+    
+    with col3:
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user_info = {}
             st.rerun()
+    
+    # Subscription info
+    show_subscription_info()
+    
+    # Main tabs
+    tabs = st.tabs([
+        "📄 Text Summarizer",
+        "💻 Code Generator", 
+        "✍️ Content Writer",
+        "📊 Data Analyzer",
+        "🌍 Language Translator",
+        "📧 Email Generator"
+    ])
+    
+    with tabs[0]:
+        text_summarizer_tab()
+    
+    with tabs[1]:
+        code_generator_tab()
+    
+    with tabs[2]:
+        content_writer_tab()
+    
+    with tabs[3]:
+        data_analyzer_tab()
+    
+    with tabs[4]:
+        language_translator_tab()
+    
+    with tabs[5]:
+        email_generator_tab()
 
-# Run the application
+# Application Router
+def main():
+    """Main application router"""
+    
+    # Authentication check
+    if not st.session_state.authenticated:
+        if st.session_state.page == 'signup':
+            signup_page()
+        else:
+            login_page()
+    else:
+        main_app()
+
 if __name__ == "__main__":
     main()
