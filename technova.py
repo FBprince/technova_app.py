@@ -4870,8 +4870,6 @@
 
 
 
-
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -5611,7 +5609,1451 @@ def set_tech_styling():
     </style>
     """, unsafe_allow_html=True)
 
-set_tech_styling()
+# Enhanced copy button function
+def copy_button(text: str, label: str = "Copy", key: str = None):
+    if text is None:
+        text = ""
+    
+    import html
+    escaped_text = html.escape(str(text))
+    button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(str(text)[:50]))}"
+    
+    copy_html = f"""
+    <div style="margin: 15px 0;">
+        <button onclick="copyToClipboard_{button_key}()" 
+                style="background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
+                       border: 2px solid rgba(0, 249, 255, 0.5);
+def signup_page():
+    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+    
+    with st.container():
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+            st.subheader("📝 Create Your TechNova Account")
+            
+            st.info("🎉 Start with a 14-day free trial! No email verification required.")
+            
+            username = st.text_input("Username", placeholder="Choose a unique username")
+            password = st.text_input("Password", type="password", placeholder="Minimum 6 characters")
+            confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+            
+            if password:
+                strength = "Weak"
+                color = "#ff4444"
+                if len(password) >= 8:
+                    strength = "Good"
+                    color = "#ffaa00"
+                if len(password) >= 12 and any(c.isupper() for c in password) and any(c.isdigit() for c in password):
+                    strength = "Strong"
+                    color = "#00ff00"
+                
+                st.markdown(f"Password Strength: <span style='color: {color}; font-weight: bold;'>{strength}</span>", unsafe_allow_html=True)
+            
+            col_create, col_back = st.columns(2)
+            
+            with col_create:
+                if st.button("🚀 Create Account", use_container_width=True):
+                    if not username or not username.strip():
+                        st.error("Please enter a username.")
+                    elif not password or not password.strip():
+                        st.error("Please enter a password.")
+                    elif not confirm_password or not confirm_password.strip():
+                        st.error("Please confirm your password.")
+                    elif password != confirm_password:
+                        st.error("Passwords do not match.")
+                    elif len(password) < 6:
+                        st.error("Password must be at least 6 characters long.")
+                    else:
+                        success, message = AuthManager.create_user(username.strip(), password)
+                        if success:
+                            st.success(message)
+                            st.balloons()
+                            st.session_state.page = 'login'
+                            st.rerun()
+                        else:
+                            st.error(message)
+            
+            with col_back:
+                if st.button("← Back to Login", use_container_width=True):
+                    st.session_state.page = 'login'
+                    st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Show pricing on signup page
+    st.markdown("---")
+    show_pricing_cards()
+
+def show_subscription_info():
+    user_info = st.session_state.user_info
+    sub_type = user_info.get('subscription_type', 'free')
+    username = user_info.get('username', '')
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        if sub_type == 'free':
+            sub_expires = user_info.get('subscription_expires')
+            if sub_expires:
+                days_left = max(0, (sub_expires - datetime.now()).days)
+                st.markdown(f"""
+                <div class="subscription-info">
+                    <span class="status-indicator status-warning"></span>
+                    <strong>🆓 Free Trial Active</strong><br>
+                    Days remaining: <strong>{days_left} days</strong><br>
+                    Daily limit: <strong>4 uses per tool</strong><br>
+                    <small>Upgrade to unlock unlimited usage!</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show upgrade button for free users
+                if st.button("⭐ Upgrade to TechNova Plus", type="primary"):
+                    st.session_state.show_upgrade_modal = True
+                    st.rerun()
+                    
+        elif sub_type == 'plus':
+            sub_expires = user_info.get('subscription_expires')
+            if sub_expires:
+                expires_str = sub_expires.strftime('%Y-%m-%d')
+                st.markdown(f"""
+                <div class="subscription-info">
+                    <span class="status-indicator status-online"></span>
+                    <strong>⭐ TechNova Plus Active</strong><br>
+                    Status: <strong>Premium Member</strong><br>
+                    Usage: <strong>Unlimited across all tools</strong><br>
+                    Renews: <strong>{expires_str}</strong><br>
+                    <small>Thank you for supporting TechNova!</small>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="subscription-info">
+                    <span class="status-indicator status-online"></span>
+                    <strong>⭐ TechNova Plus Active</strong><br>
+                    Status: <strong>Premium Member</strong><br>
+                    Usage: <strong>Unlimited across all tools</strong><br>
+                    <small>Thank you for supporting TechNova!</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        elif sub_type == 'expired':
+            st.markdown("""
+            <div class="usage-warning">
+                <span class="status-indicator status-offline"></span>
+                <strong>⚠️ Trial Expired</strong><br>
+                Your free trial has ended. Upgrade to continue using all features.<br>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Show upgrade options for expired users
+            if st.button("🚀 Reactivate with TechNova Plus", type="primary"):
+                st.session_state.show_upgrade_modal = True
+                st.rerun()
+    
+    with col2:
+        if sub_type == 'free':
+            usage_stats = UsageManager.get_usage_stats(username)
+            if usage_stats:
+                st.markdown("**📊 Today's Usage:**")
+                for tool, count in usage_stats.items():
+                    if count > 0:
+                        color = "#ff4444" if count >= 4 else "#00f9ff"
+                        st.markdown(f"<span style='color: {color};'>• {tool}: {count}/4</span>", unsafe_allow_html=True)
+
+# Upgrade modal
+def show_upgrade_modal():
+    """Display upgrade modal with Stripe integration"""
+    if st.session_state.get('show_upgrade_modal', False):
+        # Modal overlay
+        st.markdown("""
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0, 0, 0, 0.8); z-index: 999; display: flex; 
+                    align-items: center; justify-content: center;">
+            <div style="background: rgba(0, 20, 40, 0.95); border: 2px solid rgba(0, 249, 255, 0.5); 
+                        border-radius: 15px; padding: 30px; max-width: 600px; width: 90%;">
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### 🚀 Upgrade to TechNova Plus")
+        
+        username = st.session_state.user_info.get('username', '')
+        
+        # Show pricing with upgrade buttons
+        show_pricing_cards(show_upgrade_buttons=True, username=username)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("❌ Close", use_container_width=True):
+                st.session_state.show_upgrade_modal = False
+                st.rerun()
+        
+        with col2:
+            st.markdown("**💳 Secure payment powered by Stripe**")
+        
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+def check_tab_access(tab_name: str) -> bool:
+    username = st.session_state.user_info['username']
+    can_use, message = UsageManager.can_use_tab(username, tab_name)
+    
+    if not can_use:
+        st.error(message)
+        if "expired" in message.lower():
+            st.markdown("""
+            ### 🚀 Upgrade to TechNova Plus
+            
+            **🎯 What you get:**
+            - ♾️ Unlimited usage across all tools
+            - 🚀 Priority processing speed
+            - 🆕 Early access to new features
+            - 📧 Premium email support
+            """)
+            
+            # Updated pricing display with upgrade buttons
+            show_pricing_cards(show_upgrade_buttons=True, username=username)
+            
+        elif "Daily limit reached" in message:
+            st.markdown("""
+            ### ⚡ Unlock Unlimited Usage
+            
+            You've reached today's limit for this tool. Upgrade to TechNova Plus for unlimited access to all features.
+            """)
+            
+            # Show upgrade options
+            show_pricing_cards(show_upgrade_buttons=True, username=username)
+    
+    return can_use
+
+# Tab implementations
+def document_text_ai_tab():
+    st.header("📄 Document & Text AI")
+    if not check_tab_access("Document & Text AI"):
+        return
+    
+    # Log usage
+    UsageManager.log_usage(st.session_state.user_info['username'], "Document & Text AI")
+    
+    # Setup OpenAI
+    openai_available, openai_client = setup_openai()
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("📝 Text Input")
+        
+        # File upload
+        uploaded_file = st.file_uploader(
+            "Upload a document",
+            type=['txt', 'pdf', 'md', 'docx'],
+            help="Supported formats: TXT, PDF, MD, DOCX"
+        )
+        
+        if uploaded_file:
+            content, message = process_uploaded_file(uploaded_file)
+            if content:
+                st.success(message)
+                st.text_area("📄 Extracted Content", content, height=200, key="extracted_content")
+            else:
+                st.error(message)
+        
+        # Manual text input
+        text_input = st.text_area(
+            "Or paste your text here:",
+            height=200,
+            placeholder="Enter your text for AI-powered analysis and enhancement..."
+        )
+        
+        # Use uploaded content or manual input
+        working_text = content if uploaded_file and content else text_input
+        
+        if working_text:
+            st.subheader("🤖 AI Enhancement Options")
+            
+            col_enhance1, col_enhance2 = st.columns(2)
+            
+            with col_enhance1:
+                enhancement_type = st.selectbox(
+                    "Enhancement Type",
+                    ['professional', 'casual', 'academic', 'persuasive', 'simplify', 'grammar', 'clarity']
+                )
+                
+                if st.button("✨ Enhance Text", type="primary"):
+                    with st.spinner("Enhancing text with AI..."):
+                        enhanced = AITextProcessor.enhance_text(working_text, enhancement_type, openai_client)
+                        st.subheader("✨ Enhanced Text")
+                        st.write(enhanced)
+                        copy_button(enhanced, "Copy Enhanced Text", "enhanced")
+            
+            with col_enhance2:
+                st.subheader("📋 Summarization")
+                
+                summary_style = st.selectbox(
+                    "Summary Style",
+                    ['executive', 'academic', 'bullet', 'technical']
+                )
+                
+                sentence_count = st.slider("Summary Length (sentences)", 2, 10, 5)
+                
+                if st.button("📝 Generate Summary", type="primary"):
+                    with st.spinner("Creating AI summary..."):
+                        summary = AITextProcessor.ai_summarize(working_text, summary_style, sentence_count, openai_client)
+                        st.subheader("📋 Summary")
+                        st.write(summary)
+                        copy_button(summary, "Copy Summary", "summary")
+    
+    with col2:
+        if working_text:
+            st.subheader("📊 Text Analysis")
+            
+            metrics = analyze_text_metrics(working_text)
+            if metrics:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <strong>📈 Basic Metrics</strong><br>
+                    Characters: {metrics['characters']:,}<br>
+                    Words: {metrics['words']:,}<br>
+                    Sentences: {metrics['sentences']}<br>
+                    Lines: {metrics['lines']}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(f"""
+                <div class="metric-card">
+                    <strong>📐 Readability</strong><br>
+                    Avg Words/Sentence: {metrics['avg_words_per_sentence']}<br>
+                    Avg Chars/Word: {metrics['avg_chars_per_word']}<br>
+                    Unique Words: {metrics['unique_words']:,}<br>
+                    Diversity: {metrics['word_diversity']:.2%}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if metrics['top_words']:
+                    st.subheader("🔤 Top Words")
+                    for word, count in metrics['top_words'][:5]:
+                        st.write(f"• {word}: {count}")
+
+def multi_language_code_tab():
+    st.header("💻 Multi-Language Code Analysis")
+    if not check_tab_access("Multi-Language Code"):
+        return
+    
+    # Log usage
+    UsageManager.log_usage(st.session_state.user_info['username'], "Multi-Language Code")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("📝 Code Input")
+        
+        # File upload for code
+        uploaded_file = st.file_uploader(
+            "Upload code file",
+            type=['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'java', 'txt'],
+            help="Supported: Python, JavaScript, TypeScript, HTML, CSS, Java"
+        )
+        
+        filename = ""
+        if uploaded_file:
+            filename = uploaded_file.name
+            code_content = str(uploaded_file.read(), "utf-8")
+            st.success(f"Loaded {filename}")
+            st.code(code_content, language='python')
+        else:
+            code_content = st.text_area(
+                "Or paste your code here:",
+                height=300,
+                placeholder="Enter your code for analysis..."
+            )
+        
+        if code_content:
+            # Language detection
+            detected_lang = MultiLanguageAnalyzer.detect_language(code_content, filename)
+            st.info(f"Detected Language: **{detected_lang.title()}**")
+            
+            # Manual language override
+            col_lang, col_analyze = st.columns([1, 1])
+            with col_lang:
+                selected_lang = st.selectbox(
+                    "Language Override (optional)",
+                    ['auto'] + list(MultiLanguageAnalyzer.LANGUAGE_PATTERNS.keys()),
+                    index=0
+                )
+            
+            final_lang = detected_lang if selected_lang == 'auto' else selected_lang
+            
+            with col_analyze:
+                if st.button("🔍 Analyze Code", type="primary"):
+                    with st.spinner("Analyzing code..."):
+                        analysis = MultiLanguageAnalyzer.analyze_code_universal(code_content, final_lang)
+                        
+                        if 'error' in analysis:
+                            st.error(analysis['error'])
+                        else:
+                            st.session_state.code_analysis = analysis
+                            st.success("Analysis complete!")
+    
+    with col2:
+        if 'code_analysis' in st.session_state:
+            analysis = st.session_state.code_analysis
+            
+            st.subheader("📊 Code Metrics")
+            metrics = analysis.get('metrics', {})
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <strong>📈 Line Counts</strong><br>
+                Total: {metrics.get('total_lines', 0)}<br>
+                Code: {metrics.get('code_lines', 0)}<br>
+                Comments: {metrics.get('comment_lines', 0)}<br>
+                Blank: {metrics.get('blank_lines', 0)}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            quality_score = analysis.get('quality_score', 0)
+            color = "#00ff00" if quality_score >= 80 else "#ffaa00" if quality_score >= 60 else "#ff4444"
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <strong>⭐ Quality Score</strong><br>
+                <span style="color: {color}; font-size: 2rem; font-weight: bold;">{quality_score}/100</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Structure analysis
+            structure = analysis.get('structure', {})
+            if any(structure.values()):
+                st.subheader("🏗️ Code Structure")
+                
+                if structure.get('functions'):
+                    st.write("**Functions:**")
+                    for func in structure['functions'][:5]:
+                        st.write(f"• {func}")
+                
+                if structure.get('classes'):
+                    st.write("**Classes:**")
+                    for cls in structure['classes'][:5]:
+                        st.write(f"• {cls}")
+                
+                if structure.get('imports'):
+                    st.write("**Imports:**")
+                    for imp in structure['imports'][:5]:
+                        st.write(f"• {imp}")
+            
+            # Suggestions
+            suggestions = analysis.get('suggestions', [])
+            if suggestions:
+                st.subheader("💡 Suggestions")
+                for suggestion in suggestions:
+                    st.write(f"• {suggestion}")
+
+def web_intelligence_tab():
+    st.header("🌐 Web Intelligence")
+    if not check_tab_access("Web Intelligence"):
+        return
+    
+    # Log usage
+    UsageManager.log_usage(st.session_state.user_info['username'], "Web Intelligence")
+    
+    st.subheader("🔗 URL Analysis")
+    
+    url_input = st.text_input(
+        "Enter URL to analyze:",
+        placeholder="https://example.com"
+    )
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("🔍 Analyze URL", type="primary"):
+            if url_input:
+                with st.spinner("Fetching and analyzing content..."):
+                    try:
+                        response = requests.get(url_input, timeout=10)
+                        if response.status_code == 200:
+                            soup = BeautifulSoup(response.text, 'html.parser')
+                            
+                            # Extract basic info
+                            title = soup.find('title')
+                            title_text = title.get_text().strip() if title else "No title found"
+                            
+                            # Extract meta description
+                            meta_desc = soup.find('meta', attrs={'name': 'description'})
+                            description = meta_desc.get('content', '') if meta_desc else "No description found"
+                            
+                            # Extract headings
+                            headings = []
+                            for i in range(1, 7):
+                                headers = soup.find_all(f'h{i}')
+                                for h in headers[:3]:  # Limit to first 3
+                                    headings.append(f"H{i}: {h.get_text().strip()}")
+                            
+                            # Extract links
+                            links = []
+                            for link in soup.find_all('a', href=True)[:5]:  # First 5 links
+                                href = link['href']
+                                link_text = link.get_text().strip()
+                                if href.startswith('http') and link_text:
+                                    links.append(f"{link_text}: {href}")
+                            
+                            # Extract text content
+                            text_content = soup.get_text()
+                            clean_text = re.sub(r'\s+', ' ', text_content).strip()
+                            
+                            st.session_state.web_analysis = {
+                                'url': url_input,
+                                'title': title_text,
+                                'description': description,
+                                'headings': headings,
+                                'links': links,
+                                'content': clean_text[:2000] + "..." if len(clean_text) > 2000 else clean_text
+                            }
+                            
+                            st.success("Analysis complete!")
+                            
+                        else:
+                            st.error(f"Failed to fetch URL. Status code: {response.status_code}")
+                    
+                    except requests.RequestException as e:
+                        st.error(f"Error fetching URL: {str(e)}")
+                    except Exception as e:
+                        st.error(f"Error analyzing content: {str(e)}")
+            else:
+                st.error("Please enter a valid URL")
+    
+    with col2:
+        if st.button("📋 Generate Summary", type="secondary"):
+            if 'web_analysis' in st.session_state:
+                content = st.session_state.web_analysis.get('content', '')
+                if content:
+                    # Simple extractive summary
+                    sentences = safe_sentence_split(content)
+                    summary_sentences = sentences[:3]  # First 3 sentences
+                    summary = ' '.join(summary_sentences)
+                    
+                    st.session_state.web_summary = summary
+                    st.success("Summary generated!")
+                else:
+                    st.error("No content to summarize")
+            else:
+                st.error("Please analyze a URL first")
+    
+    # Display results
+    if 'web_analysis' in st.session_state:
+        analysis = st.session_state.web_analysis
+        
+        st.markdown("---")
+        st.subheader("📊 Analysis Results")
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown(f"**🏷️ Title:** {analysis['title']}")
+            st.markdown(f"**📝 Description:** {analysis['description']}")
+            
+            if analysis['headings']:
+                st.markdown("**📑 Headings:**")
+                for heading in analysis['headings']:
+                    st.write(f"• {heading}")
+            
+            if 'web_summary' in st.session_state:
+                st.markdown("**📋 Summary:**")
+                st.write(st.session_state.web_summary)
+                copy_button(st.session_state.web_summary, "Copy Summary", "web_summary")
+        
+        with col2:
+            if analysis['links']:
+                st.markdown("**🔗 Key Links:**")
+                for link in analysis['links']:
+                    st.write(f"• {link}")
+            
+            # Content preview
+            st.markdown("**📄 Content Preview:**")
+            st.text_area("Content", analysis['content'], height=200, disabled=True)
+
+def ai_assistant_tab():
+    st.header("🤖 AI Assistant")
+    if not check_tab_access("AI Assistant"):
+        return
+    
+    # Log usage
+    UsageManager.log_usage(st.session_state.user_info['username'], "AI Assistant")
+    
+    # Setup OpenAI
+    openai_available, openai_client = setup_openai()
+    
+    if not openai_available:
+        st.warning("🔧 OpenAI API not configured. Using demo responses.")
+    
+    # Chat interface
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    
+    # Display chat history
+    for i, (role, message) in enumerate(st.session_state.chat_history):
+        if role == "user":
+            st.markdown(f"**👤 You:** {message}")
+        else:
+            st.markdown(f"**🤖 Assistant:** {message}")
+    
+    # Chat input
+    user_input = st.text_area(
+        "Ask me anything:",
+        height=100,
+        placeholder="Ask about code, writing, analysis, or any topic..."
+    )
+    
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    with col1:
+        if st.button("💬 Send", type="primary"):
+            if user_input.strip():
+                # Add user message to history
+                st.session_state.chat_history.append(("user", user_input))
+                
+                # Generate AI response
+                if openai_client:
+                    try:
+                        response = openai_client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "system", "content": "You are a helpful AI assistant specialized in coding, writing, and analysis. Provide clear, concise, and practical responses."},
+                                {"role": "user", "content": user_input}
+                            ],
+                            max_tokens=1000
+                        )
+                        ai_response = response.choices[0].message.content.strip()
+                    except Exception as e:
+                        ai_response = f"Sorry, I encountered an error: {str(e)}"
+                else:
+                    # Demo response
+                    ai_response = f"""Thank you for your question: "{user_input[:50]}..."
+
+This is a demo response. The AI Assistant would provide detailed, contextual help on topics including:
+
+• Code review and debugging assistance
+• Writing enhancement and editing
+• Technical explanations and tutorials  
+• Project planning and architecture advice
+• Best practices and recommendations
+
+Enable OpenAI API integration for full AI-powered responses."""
+                
+                # Add AI response to history
+                st.session_state.chat_history.append(("assistant", ai_response))
+                
+                st.rerun()
+    
+    with col2:
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.chat_history = []
+            st.rerun()
+    
+    with col3:
+        st.markdown("**💡 Try asking about:**")
+        st.markdown("• Code debugging and optimization")
+        st.markdown("• Writing improvement and editing")
+        st.markdown("• Technical concepts and explanations")
+
+# Main application function
+def main():
+    """Main application entry point"""
+    set_tech_styling()
+    
+    # Check for payment success
+    check_payment_success()
+    
+    # Show authentication or main app
+    if not st.session_state.authenticated:
+        if st.session_state.page == 'signup':
+            signup_page()
+        else:
+            login_page()
+    else:
+        # Show upgrade modal if requested
+        if st.session_state.get('show_upgrade_modal', False):
+            show_upgrade_modal()
+        
+        # Main app interface
+        st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
+        
+        # User info and logout
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"**Welcome back, {st.session_state.user_info['username']}!** 🚀")
+        
+        with col2:
+            if st.button("🚪 Logout"):
+                st.session_state.authenticated = False
+                st.session_state.user_info = {}
+                st.session_state.page = 'login'
+                st.rerun()
+        
+        # Show subscription info
+        show_subscription_info()
+        
+        st.markdown("---")
+        
+        # Main app tabs
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📄 Document & Text AI",
+            "💻 Multi-Language Code", 
+            "🌐 Web Intelligence",
+            "🤖 AI Assistant"
+        ])
+        
+        with tab1:
+            document_text_ai_tab()
+        
+        with tab2:
+            multi_language_code_tab()
+        
+        with tab3:
+            web_intelligence_tab()
+        
+        with tab4:
+            ai_assistant_tab()
+
+# Run the application
+if __name__ == "__main__":
+    main()import streamlit as st
+import streamlit.components.v1 as components
+import requests
+from bs4 import BeautifulSoup
+import re
+import base64
+import ast
+from collections import Counter
+import io
+import json
+import hashlib
+import random
+import string
+from datetime import datetime, timedelta
+import os
+from typing import Optional, Dict, List, Tuple
+
+# Updated OpenAI import and client setup
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+# Stripe integration
+try:
+    import stripe
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+
+# Page config
+st.set_page_config(
+    page_title="TechNova AI Nexus",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Stripe Configuration
+def setup_stripe():
+    """Setup Stripe with test keys"""
+    if not STRIPE_AVAILABLE:
+        return False, None
+    
+    # Use test keys - replace with your actual test keys
+    stripe_publishable_key = os.getenv('STRIPE_PUBLISHABLE_KEY') or st.secrets.get('STRIPE_PUBLISHABLE_KEY', '')
+    stripe_secret_key = os.getenv('STRIPE_SECRET_KEY') or st.secrets.get('STRIPE_SECRET_KEY', '')
+    
+    if stripe_secret_key:
+        try:
+            stripe.api_key = stripe_secret_key
+            return True, stripe_publishable_key
+        except Exception as e:
+            st.error(f"Stripe setup error: {str(e)}")
+            return False, None
+    return False, None
+
+# Stripe Payment Handler
+class StripePaymentHandler:
+    @staticmethod
+    def create_checkout_session(price_id: str, customer_email: str = None, username: str = None):
+        """Create Stripe checkout session"""
+        try:
+            if not STRIPE_AVAILABLE:
+                return None, "Stripe not available"
+            
+            stripe_available, _ = setup_stripe()
+            if not stripe_available:
+                return None, "Stripe not configured"
+            
+            # Create checkout session
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=f"{st.secrets.get('BASE_URL', 'http://localhost:8501')}?session_id={{CHECKOUT_SESSION_ID}}&success=true",
+                cancel_url=f"{st.secrets.get('BASE_URL', 'http://localhost:8501')}?canceled=true",
+                client_reference_id=username,
+                customer_email=customer_email,
+                metadata={
+                    'username': username,
+                    'subscription_type': 'plus'
+                }
+            )
+            
+            return session.url, None
+            
+        except Exception as e:
+            return None, f"Payment session creation failed: {str(e)}"
+    
+    @staticmethod
+    def verify_payment(session_id: str) -> Tuple[bool, Dict]:
+        """Verify payment and update user subscription"""
+        try:
+            if not STRIPE_AVAILABLE:
+                return False, {}
+            
+            stripe_available, _ = setup_stripe()
+            if not stripe_available:
+                return False, {}
+            
+            session = stripe.checkout.Session.retrieve(session_id)
+            
+            if session.payment_status == 'paid':
+                username = session.metadata.get('username')
+                if username and username in st.session_state.db_users:
+                    # Update user subscription
+                    user = st.session_state.db_users[username]
+                    user['subscription_type'] = 'plus'
+                    
+                    # Determine subscription period based on price
+                    subscription = stripe.Subscription.retrieve(session.subscription)
+                    price = stripe.Price.retrieve(subscription.items.data[0].price.id)
+                    
+                    if price.recurring.interval == 'year':
+                        user['subscription_expires'] = datetime.now() + timedelta(days=365)
+                    else:  # monthly
+                        user['subscription_expires'] = datetime.now() + timedelta(days=30)
+                    
+                    user['stripe_customer_id'] = session.customer
+                    user['stripe_subscription_id'] = session.subscription
+                    
+                    return True, {
+                        'username': username,
+                        'subscription_type': 'plus',
+                        'payment_status': 'paid'
+                    }
+            
+            return False, {}
+            
+        except Exception as e:
+            st.error(f"Payment verification failed: {str(e)}")
+            return False, {}
+
+# OpenAI Configuration - Updated for v1.0+
+def setup_openai():
+    """Setup OpenAI client with fallback for missing keys"""
+    if not OPENAI_AVAILABLE:
+        return False, None
+    
+    api_key = os.getenv('OPENAI_API_KEY') or st.secrets.get('OPENAI_API_KEY', '')
+    if api_key:
+        try:
+            client = OpenAI(api_key=api_key)
+            return True, client
+        except Exception as e:
+            st.error(f"OpenAI setup error: {str(e)}")
+            return False, None
+    return False, None
+
+# In-memory database simulation with Stripe integration
+class InMemoryDB:
+    def __init__(self):
+        if 'db_users' not in st.session_state:
+            st.session_state.db_users = {}
+        if 'db_usage' not in st.session_state:
+            st.session_state.db_usage = {}
+    
+    def create_user(self, username: str, password_hash: str) -> bool:
+        if username in st.session_state.db_users:
+            return False
+        
+        st.session_state.db_users[username] = {
+            'password_hash': password_hash,
+            'created_at': datetime.now(),
+            'subscription_type': 'free',
+            'subscription_expires': datetime.now() + timedelta(days=14),
+            'id': len(st.session_state.db_users) + 1,
+            'stripe_customer_id': None,
+            'stripe_subscription_id': None
+        }
+        return True
+    
+    def get_user(self, username: str) -> Optional[Dict]:
+        return st.session_state.db_users.get(username)
+    
+    def update_user_subscription(self, username: str, subscription_data: Dict) -> bool:
+        """Update user subscription after successful payment"""
+        if username in st.session_state.db_users:
+            user = st.session_state.db_users[username]
+            user.update(subscription_data)
+            return True
+        return False
+    
+    def log_usage(self, username: str, tab_name: str):
+        today = datetime.now().date().isoformat()
+        key = f"{username}_{tab_name}_{today}"
+        st.session_state.db_usage[key] = st.session_state.db_usage.get(key, 0) + 1
+    
+    def get_usage_count(self, username: str, tab_name: str) -> int:
+        today = datetime.now().date().isoformat()
+        key = f"{username}_{tab_name}_{today}"
+        return st.session_state.db_usage.get(key, 0)
+
+db = InMemoryDB()
+
+# Authentication Functions
+class AuthManager:
+    @staticmethod
+    def hash_password(password: str) -> str:
+        return hashlib.sha256(password.encode()).hexdigest()
+    
+    @staticmethod
+    def verify_password(password: str, hashed: str) -> bool:
+        return hashlib.sha256(password.encode()).hexdigest() == hashed
+    
+    @staticmethod
+    def create_user(username: str, password: str) -> Tuple[bool, str]:
+        if len(username) < 3:
+            return False, "Username must be at least 3 characters long."
+        
+        if len(password) < 6:
+            return False, "Password must be at least 6 characters long."
+        
+        try:
+            password_hash = AuthManager.hash_password(password)
+            
+            if db.create_user(username, password_hash):
+                return True, "Account created successfully! You have a 14-day free trial."
+            else:
+                return False, "Username already exists."
+                
+        except Exception as e:
+            return False, f"Error creating account: {str(e)}"
+    
+    @staticmethod
+    def login_user(username: str, password: str) -> Tuple[bool, str, Dict]:
+        try:
+            user = db.get_user(username)
+            if not user:
+                return False, "Invalid username or password.", {}
+            
+            if not AuthManager.verify_password(password, user['password_hash']):
+                return False, "Invalid username or password.", {}
+            
+            sub_type = user['subscription_type']
+            if user['subscription_expires'] and datetime.now() > user['subscription_expires']:
+                sub_type = 'expired'
+            
+            user_info = {
+                'id': user['id'],
+                'username': username,
+                'subscription_type': sub_type,
+                'subscription_expires': user['subscription_expires']
+            }
+            
+            return True, "Login successful!", user_info
+            
+        except Exception as e:
+            return False, f"Login error: {str(e)}", {}
+
+# Multi-Language Code Analysis
+class MultiLanguageAnalyzer:
+    LANGUAGE_PATTERNS = {
+        'python': {
+            'extensions': ['.py'],
+            'keywords': ['def', 'class', 'import', 'from', 'if', 'elif', 'else', 'for', 'while'],
+            'comment_chars': ['#'],
+            'string_delims': ['"', "'"]
+        },
+        'javascript': {
+            'extensions': ['.js', '.jsx'],
+            'keywords': ['function', 'var', 'let', 'const', 'if', 'else', 'for', 'while', 'class'],
+            'comment_chars': ['//'],
+            'string_delims': ['"', "'", '`']
+        },
+        'typescript': {
+            'extensions': ['.ts', '.tsx'],
+            'keywords': ['function', 'var', 'let', 'const', 'interface', 'type', 'class', 'enum'],
+            'comment_chars': ['//'],
+            'string_delims': ['"', "'", '`']
+        },
+        'html': {
+            'extensions': ['.html', '.htm'],
+            'keywords': ['<html>', '<head>', '<body>', '<div>', '<span>', '<p>'],
+            'comment_chars': ['<!--'],
+            'string_delims': ['"', "'"]
+        },
+        'css': {
+            'extensions': ['.css'],
+            'keywords': ['body', 'div', 'class', 'id', 'margin', 'padding', 'color'],
+            'comment_chars': ['/*'],
+            'string_delims': ['"', "'"]
+        },
+        'java': {
+            'extensions': ['.java'],
+            'keywords': ['public', 'private', 'class', 'interface', 'import', 'package'],
+            'comment_chars': ['//'],
+            'string_delims': ['"']
+        }
+    }
+    
+    @staticmethod
+    def detect_language(code: str, filename: str = "") -> str:
+        """Detect programming language from code content and filename"""
+        # Check file extension first
+        if filename:
+            ext = '.' + filename.split('.')[-1].lower()
+            for lang, props in MultiLanguageAnalyzer.LANGUAGE_PATTERNS.items():
+                if ext in props['extensions']:
+                    return lang
+        
+        # Analyze code content
+        code_lower = code.lower()
+        language_scores = {}
+        
+        for lang, props in MultiLanguageAnalyzer.LANGUAGE_PATTERNS.items():
+            score = 0
+            for keyword in props['keywords']:
+                score += code_lower.count(keyword.lower())
+            language_scores[lang] = score
+        
+        if language_scores:
+            return max(language_scores, key=language_scores.get)
+        
+        return 'unknown'
+    
+    @staticmethod
+    def analyze_code_universal(code: str, language: str) -> Dict:
+        """Universal code analysis for multiple languages"""
+        try:
+            lines = code.splitlines()
+            total_lines = len(lines)
+            code_lines = len([l for l in lines if l.strip() and not MultiLanguageAnalyzer._is_comment(l.strip(), language)])
+            comment_lines = total_lines - code_lines - len([l for l in lines if not l.strip()])
+            blank_lines = len([l for l in lines if not l.strip()])
+            
+            analysis = {
+                'language': language,
+                'metrics': {
+                    'total_lines': total_lines,
+                    'code_lines': code_lines,
+                    'comment_lines': comment_lines,
+                    'blank_lines': blank_lines,
+                    'avg_line_length': sum(len(l) for l in lines) / total_lines if total_lines > 0 else 0
+                },
+                'structure': MultiLanguageAnalyzer._analyze_structure(code, language),
+                'quality_score': MultiLanguageAnalyzer._calculate_quality_score(code, language),
+                'suggestions': MultiLanguageAnalyzer._get_suggestions(code, language)
+            }
+            
+            return analysis
+            
+        except Exception as e:
+            return {'error': f"Analysis failed: {str(e)}"}
+    
+    @staticmethod
+    def _is_comment(line: str, language: str) -> bool:
+        """Check if a line is a comment in the given language"""
+        props = MultiLanguageAnalyzer.LANGUAGE_PATTERNS.get(language, {})
+        comment_chars = props.get('comment_chars', [])
+        
+        for char in comment_chars:
+            if line.startswith(char):
+                return True
+        return False
+    
+    @staticmethod
+    def _analyze_structure(code: str, language: str) -> Dict:
+        """Analyze code structure based on language"""
+        structure = {
+            'functions': [],
+            'classes': [],
+            'imports': [],
+            'variables': []
+        }
+        
+        if language == 'python':
+            try:
+                tree = ast.parse(code)
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef):
+                        structure['functions'].append(node.name)
+                    elif isinstance(node, ast.ClassDef):
+                        structure['classes'].append(node.name)
+                    elif isinstance(node, ast.Import):
+                        for alias in node.names:
+                            structure['imports'].append(alias.name)
+            except:
+                pass
+        
+        elif language in ['javascript', 'typescript']:
+            # Basic JS/TS pattern matching
+            functions = re.findall(r'function\s+(\w+)', code)
+            structure['functions'].extend(functions)
+            
+            classes = re.findall(r'class\s+(\w+)', code)
+            structure['classes'].extend(classes)
+            
+            imports = re.findall(r'import.*from\s+["\']([^"\']+)["\']', code)
+            structure['imports'].extend(imports)
+        
+        elif language == 'java':
+            classes = re.findall(r'(?:public\s+)?class\s+(\w+)', code)
+            structure['classes'].extend(classes)
+            
+            methods = re.findall(r'(?:public|private|protected)?\s*\w+\s+(\w+)\s*\(', code)
+            structure['functions'].extend(methods)
+        
+        return structure
+    
+    @staticmethod
+    def _calculate_quality_score(code: str, language: str) -> int:
+        """Calculate a basic quality score (0-100)"""
+        score = 50  # Base score
+        lines = code.splitlines()
+        
+        # Comment ratio
+        comment_ratio = len([l for l in lines if MultiLanguageAnalyzer._is_comment(l.strip(), language)]) / len(lines) if lines else 0
+        if 0.1 <= comment_ratio <= 0.3:
+            score += 20
+        elif comment_ratio > 0.3:
+            score += 10
+        
+        # Line length
+        avg_line_length = sum(len(l) for l in lines) / len(lines) if lines else 0
+        if 50 <= avg_line_length <= 100:
+            score += 15
+        elif avg_line_length > 120:
+            score -= 10
+        
+        # Indentation consistency (basic check)
+        indentation_consistent = len(set(len(l) - len(l.lstrip()) for l in lines if l.strip())) <= 3
+        if indentation_consistent:
+            score += 15
+        
+        return min(100, max(0, score))
+    
+    @staticmethod
+    def _get_suggestions(code: str, language: str) -> List[str]:
+        """Generate improvement suggestions based on language"""
+        suggestions = []
+        lines = code.splitlines()
+        
+        # General suggestions
+        comment_lines = len([l for l in lines if MultiLanguageAnalyzer._is_comment(l.strip(), language)])
+        if comment_lines == 0:
+            suggestions.append(f"Add comments to explain your {language} code")
+        
+        avg_line_length = sum(len(l) for l in lines) / len(lines) if lines else 0
+        if avg_line_length > 120:
+            suggestions.append("Consider breaking long lines for better readability")
+        
+        # Language-specific suggestions
+        if language == 'python':
+            if 'import *' in code:
+                suggestions.append("Avoid wildcard imports - import specific functions instead")
+            if not re.search(r'if __name__ == ["\']__main__["\']:', code) and len(lines) > 20:
+                suggestions.append("Consider adding if __name__ == '__main__': guard")
+        
+        elif language in ['javascript', 'typescript']:
+            if 'var ' in code:
+                suggestions.append("Consider using 'let' or 'const' instead of 'var'")
+            if '==' in code and '===' not in code:
+                suggestions.append("Use strict equality (===) instead of loose equality (==)")
+        
+        elif language == 'html':
+            if not re.search(r'<!DOCTYPE html>', code, re.IGNORECASE):
+                suggestions.append("Add DOCTYPE declaration for valid HTML5")
+            if '<meta charset=' not in code.lower():
+                suggestions.append("Include character encoding meta tag")
+        
+        return suggestions
+
+# AI-Enhanced Text Processor - Updated for OpenAI v1.0+
+class AITextProcessor:
+    @staticmethod
+    def enhance_text(text: str, enhancement_type: str, client=None) -> str:
+        """AI-powered text enhancement using new OpenAI client"""
+        if not client:
+            return AITextProcessor._mock_enhancement(text, enhancement_type)
+        
+        try:
+            prompts = {
+                'professional': "Rewrite this text in a professional, business-appropriate tone while maintaining the original meaning:",
+                'casual': "Rewrite this text in a casual, friendly tone while keeping the core message:",
+                'academic': "Rewrite this text in an academic, scholarly tone with formal language:",
+                'persuasive': "Rewrite this text to be more persuasive and compelling:",
+                'simplify': "Simplify this text to make it easier to understand while keeping all important information:",
+                'grammar': "Fix any grammar, spelling, and punctuation errors in this text:",
+                'clarity': "Improve the clarity and flow of this text while maintaining its meaning:"
+            }
+            
+            prompt = prompts.get(enhancement_type, prompts['grammar'])
+            
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a professional writing assistant."},
+                    {"role": "user", "content": f"{prompt}\n\n{text}"}
+                ],
+                max_tokens=1500
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            return f"AI enhancement unavailable: {str(e)}"
+    
+    @staticmethod
+    def _mock_enhancement(text: str, enhancement_type: str) -> str:
+        """Mock enhancement for demo purposes"""
+        enhancements = {
+            'professional': "This text has been enhanced for professional communication with improved tone and structure.",
+            'casual': "This text has been rewritten in a more casual, approachable style.",
+            'academic': "This text has been adapted for academic writing with formal language and structure.",
+            'persuasive': "This text has been enhanced with persuasive elements and compelling arguments.",
+            'simplify': "This text has been simplified for better readability and understanding.",
+            'grammar': "Grammar, spelling, and punctuation have been corrected throughout this text.",
+            'clarity': "The clarity and flow of this text have been improved for better comprehension."
+        }
+        
+        return f"""[AI Enhancement: {enhancement_type.title()}]
+
+{enhancements.get(enhancement_type, 'Text has been enhanced.')}
+
+Enhanced version:
+{text[:500]}{'...' if len(text) > 500 else ''}
+
+Note: This is a demo response. Enable OpenAI API for full AI-powered enhancements."""
+    
+    @staticmethod
+    def ai_summarize(text: str, style: str, sentences: int, client=None) -> str:
+        """AI-powered summarization using new OpenAI client"""
+        if not client:
+            return AITextProcessor._mock_summary(text, style, sentences)
+        
+        try:
+            style_prompts = {
+                'executive': f"Create an executive summary in {sentences} sentences focusing on key decisions and outcomes:",
+                'academic': f"Create an academic summary in {sentences} sentences with formal analysis:",
+                'bullet': f"Create a bullet point summary with {sentences} key points:",
+                'technical': f"Create a technical summary in {sentences} sentences focusing on implementation details:"
+            }
+            
+            prompt = style_prompts.get(style, f"Summarize this text in {sentences} clear, concise sentences:")
+            
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an expert at creating clear, accurate summaries."},
+                    {"role": "user", "content": f"{prompt}\n\n{text}"}
+                ],
+                max_tokens=800
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            return f"AI summarization unavailable: {str(e)}"
+    
+    @staticmethod
+    def _mock_summary(text: str, style: str, sentences: int) -> str:
+        """Mock summarization for demo"""
+        return f"""[AI Summary: {style} style, {sentences} sentences]
+
+This is a demonstration summary of your content. The AI would analyze the key themes, extract main points, and create a coherent summary based on your selected style and length preferences.
+
+Key points identified:
+• Main themes and concepts
+• Important data and statistics  
+• Conclusions and recommendations
+• Action items and next steps
+
+Note: Enable OpenAI API for intelligent semantic summarization."""
+
+# Enhanced styling
+def set_tech_styling():
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;500&display=swap');
+    
+    .stApp {
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+        color: #00f9ff;
+        font-family: 'Rajdhani', sans-serif;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Orbitron', monospace !important;
+        color: #00f9ff !important;
+        text-shadow: 0 0 10px rgba(0, 249, 255, 0.5);
+    }
+    
+    .main-title {
+        font-size: 3rem;
+        text-align: center;
+        background: linear-gradient(45deg, #00f9ff, #0099cc, #66ccff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 2rem 0;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.8; }
+        100% { opacity: 1; }
+    }
+    
+    .auth-container {
+        max-width: 450px;
+        margin: 0 auto;
+        padding: 2rem;
+        border: 2px solid rgba(0, 249, 255, 0.3);
+        border-radius: 15px;
+        background: rgba(0, 20, 40, 0.7);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 249, 255, 0.1);
+    }
+    
+    .feature-card {
+        background: rgba(0, 20, 40, 0.6);
+        border: 1px solid rgba(0, 249, 255, 0.3);
+        border-radius: 10px;
+        padding: 20px;
+        margin: 15px 0;
+        transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        border-color: rgba(0, 249, 255, 0.6);
+        box-shadow: 0 4px 20px rgba(0, 249, 255, 0.2);
+    }
+    
+    .usage-warning {
+        background: rgba(255, 193, 7, 0.1);
+        border: 2px solid #ffc107;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    .subscription-info {
+        background: rgba(0, 249, 255, 0.1);
+        border: 2px solid rgba(0, 249, 255, 0.3);
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+    }
+    
+    .pricing-card {
+        background: rgba(0, 153, 204, 0.1);
+        border: 2px solid rgba(0, 153, 204, 0.4);
+        border-radius: 12px;
+        padding: 25px;
+        margin: 15px 0;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+        border-color: rgba(0, 153, 204, 0.6);
+        box-shadow: 0 6px 25px rgba(0, 153, 204, 0.2);
+        transform: translateY(-2px);
+    }
+    
+    .pricing-highlight {
+        background: rgba(0, 249, 255, 0.15);
+        border: 2px solid rgba(0, 249, 255, 0.5);
+        position: relative;
+    }
+    
+    .pricing-highlight::before {
+        content: "BEST VALUE";
+        position: absolute;
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(45deg, #00f9ff, #0099cc);
+        color: #000;
+        padding: 5px 15px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    
+    .metric-card {
+        background: rgba(0, 20, 40, 0.8);
+        border: 1px solid rgba(0, 249, 255, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        margin: 10px 0;
+    }
+    
+    .enhancement-card {
+        background: rgba(0, 153, 204, 0.1);
+        border: 1px solid rgba(0, 153, 204, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+    
+    .stTextArea textarea, .stTextInput input {
+        background: rgba(0, 20, 40, 0.8) !important;
+        border: 2px solid rgba(0, 249, 255, 0.3) !important;
+        color: #00f9ff !important;
+        border-radius: 8px !important;
+    }
+    
+    .stTextArea textarea:focus, .stTextInput input:focus {
+        border-color: rgba(0, 249, 255, 0.6) !important;
+        box-shadow: 0 0 10px rgba(0, 249, 255, 0.3) !important;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3)) !important;
+        border: 2px solid rgba(0, 249, 255, 0.5) !important;
+        color: #00f9ff !important;
+        font-weight: bold !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, rgba(0, 249, 255, 0.3), rgba(0, 153, 204, 0.4)) !important;
+        border-color: rgba(0, 249, 255, 0.8) !important;
+        box-shadow: 0 4px 15px rgba(0, 249, 255, 0.3) !important;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-online { background-color: #00ff00; }
+    .status-warning { background-color: #ffc107; }
+    .status-offline { background-color: #ff0000; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Enhanced copy button function
 def copy_button(text: str, label: str = "Copy", key: str = None):
@@ -6103,199 +7545,3 @@ def login_page():
     # Updated pricing display on login page
     st.markdown("---")
     show_pricing_cards()
-
-def signup_page():
-    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
-    
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-            st.subheader("📝 Create Your TechNova Account")
-            
-            st.info("🎉 Start with a 14-day free trial! No email verification required.")
-            
-            username = st.text_input("Username", placeholder="Choose a unique username")
-            password = st.text_input("Password", type="password", placeholder="Minimum 6 characters")
-            confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
-            
-            if password:
-                strength = "Weak"
-                color = "#ff4444"
-                if len(password) >= 8:
-                    strength = "Good"
-                    color = "#ffaa00"
-                if len(password) >= 12 and any(c.isupper() for c in password) and any(c.isdigit() for c in password):
-                    strength = "Strong"
-                    color = "#00ff00"
-                
-                st.markdown(f"Password Strength: <span style='color: {color}; font-weight: bold;'>{strength}</span>", unsafe_allow_html=True)
-            
-            col_create, col_back = st.columns(2)
-            
-            with col_create:
-                if st.button("🚀 Create Account", use_container_width=True):
-                    if not username or not username.strip():
-                        st.error("Please enter a username.")
-                    elif not password or not password.strip():
-                        st.error("Please enter a password.")
-                    elif not confirm_password or not confirm_password.strip():
-                        st.error("Please confirm your password.")
-                    elif password != confirm_password:
-                        st.error("Passwords do not match.")
-                    elif len(password) < 6:
-                        st.error("Password must be at least 6 characters long.")
-                    else:
-                        success, message = AuthManager.create_user(username.strip(), password)
-                        if success:
-                            st.success(message)
-                            st.balloons()
-                            st.session_state.page = 'login'
-                            st.rerun()
-                        else:
-                            st.error(message)
-            
-            with col_back:
-                if st.button("← Back to Login", use_container_width=True):
-                    st.session_state.page = 'login'
-                    st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Show pricing on signup page
-    st.markdown("---")
-    show_pricing_cards()
-
-def show_subscription_info():
-    user_info = st.session_state.user_info
-    sub_type = user_info.get('subscription_type', 'free')
-    username = user_info.get('username', '')
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        if sub_type == 'free':
-            sub_expires = user_info.get('subscription_expires')
-            if sub_expires:
-                days_left = max(0, (sub_expires - datetime.now()).days)
-                st.markdown(f"""
-                <div class="subscription-info">
-                    <span class="status-indicator status-warning"></span>
-                    <strong>🆓 Free Trial Active</strong><br>
-                    Days remaining: <strong>{days_left} days</strong><br>
-                    Daily limit: <strong>4 uses per tool</strong><br>
-                    <small>Upgrade to unlock unlimited usage!</small>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Show upgrade button for free users
-                if st.button("⭐ Upgrade to TechNova Plus", type="primary"):
-                    st.session_state.show_upgrade_modal = True
-                    st.rerun()
-                    
-        elif sub_type == 'plus':
-            sub_expires = user_info.get('subscription_expires')
-            if sub_expires:
-                expires_str = sub_expires.strftime('%Y-%m-%d')
-                st.markdown(f"""
-                <div class="subscription-info">
-                    <span class="status-indicator status-online"></span>
-                    <strong>⭐ TechNova Plus Active</strong><br>
-                    Status: <strong>Premium Member</strong><br>
-                    Usage: <strong>Unlimited across all tools</strong><br>
-                    Renews: <strong>{expires_str}</strong><br>
-                    <small>Thank you for supporting TechNova!</small>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                <div class="subscription-info">
-                    <span class="status-indicator status-online"></span>
-                    <strong>⭐ TechNova Plus Active</strong><br>
-                    Status: <strong>Premium Member</strong><br>
-                    Usage: <strong>Unlimited across all tools</strong><br>
-                    <small>Thank you for supporting TechNova!</small>
-                </div>
-                """, unsafe_allow_html=True)
-                
-        elif sub_type == 'expired':
-            st.markdown("""
-            <div class="usage-warning">
-                <span class="status-indicator status-offline"></span>
-                <strong>⚠️ Trial Expired</strong><br>
-                Your free trial has ended. Upgrade to continue using all features.<br>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Show upgrade options for expired users
-            if st.button("🚀 Reactivate with TechNova Plus", type="primary"):
-                st.session_state.show_upgrade_modal = True
-                st.rerun()
-    
-    with col2:
-        if sub_type == 'free':
-            usage_stats = UsageManager.get_usage_stats(username)
-            if usage_stats:
-                st.markdown("**📊 Today's Usage:**")
-                for tool, count in usage_stats.items():
-                    if count > 0:
-                        color = "#ff4444" if count >= 4 else "#00f9ff"
-                        st.markdown(f"<span style='color: {color};'>• {tool}: {count}/4</span>", unsafe_allow_html=True)
-
-# Upgrade modal
-def show_upgrade_modal():
-    """Display upgrade modal with Stripe integration"""
-    if st.session_state.get('show_upgrade_modal', False):
-        # Modal overlay
-        st.markdown("""
-        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background: rgba(0, 0, 0, 0.8); z-index: 999; display: flex; 
-                    align-items: center; justify-content: center;">
-            <div style="background: rgba(0, 20, 40, 0.95); border: 2px solid rgba(0, 249, 255, 0.5); 
-                        border-radius: 15px; padding: 30px; max-width: 600px; width: 90%;">
-        """, unsafe_allow_html=True)
-        
-        st.markdown("### 🚀 Upgrade to TechNova Plus")
-        
-        username = st.session_state.user_info.get('username', '')
-        
-        # Show pricing with upgrade buttons
-        show_pricing_cards(show_upgrade_buttons=True, username=username)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("❌ Close", use_container_width=True):
-                st.session_state.show_upgrade_modal = False
-                st.rerun()
-        
-        with col2:
-            st.markdown("**💳 Secure payment powered by Stripe**")
-        
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-def check_tab_access(tab_name: str) -> bool:
-    username = st.session_state.user_info['username']
-    can_use, message = UsageManager.can_use_tab(username, tab_name)
-    
-    if not can_use:
-        st.error(message)
-        if "expired" in message.lower():
-            st.markdown("""
-            ### 🚀 Upgrade to TechNova Plus
-            
-            **🎯 What you get:**
-            - ♾️ Unlimited usage across all tools
-            - 🚀 Priority processing speed
-            - 🆕 Early access to new features
-            - 📧 Premium email support
-            """)
-            
-            # Updated pricing display with upgrade buttons
-            show_pricing_cards(show_upgrade_buttons=True, username=username)
-            
-        elif "Daily limit reached" in message:
-            st.markdown("""
-            ### ⚡ Unlock Unlimited Usage
-            
-            You've reached today's limit for this tool. Upgrade to TechNova Plus for full access to all tabs, unlimited usage, and exclusive tools.
