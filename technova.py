@@ -4907,7 +4907,6 @@ try:
     STRIPE_AVAILABLE = True
 except ImportError:
     STRIPE_AVAILABLE = False
-    st.warning("Stripe not available. Install with: pip install stripe")
 
 try:
     import bcrypt
@@ -5301,11 +5300,11 @@ if 'page' not in st.session_state:
     st.session_state.page = 'login'
 
 # Handle payment success from URL parameters
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 if 'success' in query_params and 'session_id' in query_params:
-    PaymentManager.handle_successful_payment(query_params['session_id'][0])
+    PaymentManager.handle_successful_payment(query_params['session_id'])
     # Clear query parameters
-    st.experimental_set_query_params()
+    st.query_params.clear()
 
 # Styling
 def set_tech_styling():
