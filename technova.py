@@ -4874,6 +4874,7 @@
 
 
 
+
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -4949,9 +4950,13 @@ def load_secrets():
 # Load secrets
 SECRETS = load_secrets()
 
-# Initialize OpenAI if available
+# Initialize OpenAI client if available
+openai_client = None
 if OPENAI_AVAILABLE and SECRETS['OPENAI_API_KEY']:
-    openai.api_key = SECRETS['OPENAI_API_KEY']
+    try:
+        openai_client = openai.OpenAI(api_key=SECRETS['OPENAI_API_KEY'])
+    except Exception as e:
+        st.error(f"Error initializing OpenAI client: {e}")
 
 # Initialize Stripe if available
 if STRIPE_AVAILABLE and SECRETS['STRIPE_SECRET_KEY']:
@@ -5732,8 +5737,8 @@ def extract_text_from_pdf(pdf_file):
         return f"Error reading PDF: {str(e)}"
 
 def get_openai_response(prompt: str, system_prompt: str = "") -> str:
-    """Get response from OpenAI API"""
-    if not OPENAI_AVAILABLE or not SECRETS['OPENAI_API_KEY']:
+    """Get response from OpenAI API using the new client interface"""
+    if not OPENAI_AVAILABLE or not openai_client:
         return "OpenAI API not configured. Please add your API key to the secrets."
     
     try:
@@ -5742,7 +5747,7 @@ def get_openai_response(prompt: str, system_prompt: str = "") -> str:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
         
-        response = openai.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
             max_tokens=1500,
