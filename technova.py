@@ -4891,21 +4891,6 @@ import os
 
 # Safe imports with error handling
 try:
-    import smtplib
-    from email.mime.text import MimeText
-    from email.mime.multipart import MimeMultipart
-    EMAIL_AVAILABLE = True
-except ImportError:
-    EMAIL_AVAILABLE = False
-    st.warning("Email functionality not available in this environment.")
-
-try:
-    import bcrypt
-    BCRYPT_AVAILABLE = True
-except ImportError:
-    BCRYPT_AVAILABLE = False
-
-try:
     import openai
     OPENAI_AVAILABLE = True
 except ImportError:
@@ -4916,6 +4901,19 @@ try:
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
+
+try:
+    import stripe
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+    st.warning("Stripe not available. Install with: pip install stripe")
+
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    BCRYPT_AVAILABLE = False
 
 # Page config
 st.set_page_config(
@@ -4930,24 +4928,28 @@ def load_secrets():
     try:
         return {
             'OPENAI_API_KEY': st.secrets.get("OPENAI_API_KEY", ""),
-            'SMTP_SERVER': st.secrets.get("SMTP_SERVER", "smtp.gmail.com"),
-            'SMTP_PORT': int(st.secrets.get("SMTP_PORT", 587)),
-            'SMTP_USERNAME': st.secrets.get("SMTP_USERNAME", ""),
-            'SMTP_PASSWORD': st.secrets.get("SMTP_PASSWORD", ""),
-            'STRIPE_SECRET_KEY': st.secrets.get("STRIPE_SECRET_KEY", "")
+            'STRIPE_PUBLISHABLE_KEY': st.secrets.get("STRIPE_PUBLISHABLE_KEY", ""),
+            'STRIPE_SECRET_KEY': st.secrets.get("STRIPE_SECRET_KEY", ""),
+            'STRIPE_MONTHLY_PRICE_ID': st.secrets.get("STRIPE_MONTHLY_PRICE_ID", ""),
+            'STRIPE_ANNUAL_PRICE_ID': st.secrets.get("STRIPE_ANNUAL_PRICE_ID", ""),
+            'BASE_URL': st.secrets.get("BASE_URL", "http://localhost:8501")
         }
     except Exception as e:
         return {
             'OPENAI_API_KEY': "",
-            'SMTP_SERVER': "smtp.gmail.com",
-            'SMTP_PORT': 587,
-            'SMTP_USERNAME': "",
-            'SMTP_PASSWORD': "",
-            'STRIPE_SECRET_KEY': ""
+            'STRIPE_PUBLISHABLE_KEY': "",
+            'STRIPE_SECRET_KEY': "",
+            'STRIPE_MONTHLY_PRICE_ID': "",
+            'STRIPE_ANNUAL_PRICE_ID': "",
+            'BASE_URL': "http://localhost:8501"
         }
 
 # Load secrets
 SECRETS = load_secrets()
+
+# Initialize Stripe if available
+if STRIPE_AVAILABLE and SECRETS['STRIPE_SECRET_KEY']:
+    stripe.api_key = SECRETS['STRIPE_SECRET_KEY']
 
 # Database Setup
 def init_database():
@@ -4956,18 +4958,17 @@ def init_database():
         conn = sqlite3.connect('technova.db', timeout=10)
         cursor = conn.cursor()
         
-        # Users table
+        # Users table (updated for username instead of email)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
+                username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_verified BOOLEAN DEFAULT FALSE,
                 subscription_type TEXT DEFAULT 'free',
                 subscription_expires TIMESTAMP,
-                verification_code TEXT,
-                verification_expires TIMESTAMP
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT
             )
         ''')
         
@@ -5023,177 +5024,71 @@ class AuthManager:
             return False
     
     @staticmethod
-    def generate_verification_code() -> str:
-        """Generate a 6-digit verification code"""
-        return ''.join(random.choices(string.digits, k=6))
+    def is_valid_username(username: str) -> bool:
+        """Check if username is valid (alphanumeric + underscore, 3-20 chars)"""
+        pattern = r'^[a-zA-Z0-9_]{3,20}$'
+        return bool(re.match(pattern, username))
     
     @staticmethod
-    def is_valid_gmail(email: str) -> bool:
-        """Check if email is a valid Gmail address"""
-        gmail_pattern = r'^[a-zA-Z0-9._%+-]+@gmail\.com$'
-        return bool(re.match(gmail_pattern, email))
-    
-    @staticmethod
-    def send_verification_email(email: str, verification_code: str) -> bool:
-        """Send verification code via email"""
-        if not EMAIL_AVAILABLE:
-            st.error("Email functionality not available in this environment.")
-            return False
-            
-        if not SECRETS['SMTP_USERNAME'] or not SECRETS['SMTP_PASSWORD']:
-            st.error("Email service not configured. Please contact administrator.")
-            return False
-        
-        try:
-            msg = MimeMultipart()
-            msg['From'] = SECRETS['SMTP_USERNAME']
-            msg['To'] = email
-            msg['Subject'] = "TechNova AI Nexus - Verification Code"
-            
-            body = f"""
-            Welcome to TechNova AI Nexus!
-            
-            Your verification code is: {verification_code}
-            
-            This code will expire in 10 minutes.
-            
-            Best regards,
-            TechNova Team
-            """
-            
-            msg.attach(MimeText(body, 'plain'))
-            
-            server = smtplib.SMTP(SECRETS['SMTP_SERVER'], SECRETS['SMTP_PORT'])
-            server.starttls()
-            server.login(SECRETS['SMTP_USERNAME'], SECRETS['SMTP_PASSWORD'])
-            text = msg.as_string()
-            server.sendmail(SECRETS['SMTP_USERNAME'], email, text)
-            server.quit()
-            
-            return True
-        except Exception as e:
-            st.error(f"Failed to send verification email: {str(e)}")
-            return False
-    
-    @staticmethod
-    def create_user(email: str, password: str) -> tuple[bool, str]:
+    def create_user(username: str, password: str) -> tuple[bool, str]:
         """Create a new user account"""
-        if not AuthManager.is_valid_gmail(email):
-            return False, "Please provide a valid Gmail address."
+        if not AuthManager.is_valid_username(username):
+            return False, "Username must be 3-20 characters long and contain only letters, numbers, and underscores."
         
         try:
             conn = sqlite3.connect('technova.db', timeout=10)
             cursor = conn.cursor()
             
             # Check if user already exists
-            cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+            cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
             if cursor.fetchone():
                 conn.close()
-                return False, "An account with this email already exists."
-            
-            # Generate verification code
-            verification_code = AuthManager.generate_verification_code()
-            expires_at = datetime.now() + timedelta(minutes=10)
+                return False, "A user with this username already exists."
             
             # Hash password
             password_hash = AuthManager.hash_password(password)
             
-            # Create user - auto-verify if email not available
-            is_verified = not EMAIL_AVAILABLE
-            
+            # Create user with 14-day free trial
             cursor.execute('''
-                INSERT INTO users (email, password_hash, verification_code, verification_expires, subscription_expires, is_verified)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (email, password_hash, verification_code, expires_at.isoformat(), 
-                  (datetime.now() + timedelta(days=14)).isoformat(), is_verified))
+                INSERT INTO users (username, password_hash, subscription_expires)
+                VALUES (?, ?, ?)
+            ''', (username, password_hash, (datetime.now() + timedelta(days=14)).isoformat()))
             
             conn.commit()
             conn.close()
             
-            if EMAIL_AVAILABLE:
-                # Send verification email
-                if AuthManager.send_verification_email(email, verification_code):
-                    return True, "Account created! Please check your Gmail for verification code."
-                else:
-                    return True, "Account created but failed to send verification email. Contact support."
-            else:
-                return True, "Account created and automatically verified! You can now log in."
+            return True, "Account created successfully! You have a 14-day free trial."
                 
         except Exception as e:
             return False, f"Error creating account: {str(e)}"
     
     @staticmethod
-    def verify_user(email: str, verification_code: str) -> tuple[bool, str]:
-        """Verify user with verification code"""
-        try:
-            conn = sqlite3.connect('technova.db', timeout=10)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, verification_code, verification_expires 
-                FROM users WHERE email = ? AND is_verified = FALSE
-            ''', (email,))
-            
-            result = cursor.fetchone()
-            if not result:
-                conn.close()
-                return False, "User not found or already verified."
-            
-            user_id, stored_code, expires_at = result
-            expires_at = datetime.fromisoformat(expires_at)
-            
-            if datetime.now() > expires_at:
-                conn.close()
-                return False, "Verification code expired. Please request a new one."
-            
-            if stored_code != verification_code:
-                conn.close()
-                return False, "Invalid verification code."
-            
-            # Mark user as verified
-            cursor.execute('''
-                UPDATE users SET is_verified = TRUE, verification_code = NULL, verification_expires = NULL
-                WHERE id = ?
-            ''', (user_id,))
-            
-            conn.commit()
-            conn.close()
-            return True, "Account verified successfully!"
-            
-        except Exception as e:
-            return False, f"Verification error: {str(e)}"
-    
-    @staticmethod
-    def login_user(email: str, password: str) -> tuple[bool, str, dict]:
+    def login_user(username: str, password: str) -> tuple[bool, str, dict]:
         """Login user and return user info"""
         try:
             conn = sqlite3.connect('technova.db', timeout=10)
             cursor = conn.cursor()
             
             cursor.execute('''
-                SELECT id, password_hash, is_verified, subscription_type, subscription_expires 
-                FROM users WHERE email = ?
-            ''', (email,))
+                SELECT id, password_hash, subscription_type, subscription_expires, stripe_customer_id, stripe_subscription_id
+                FROM users WHERE username = ?
+            ''', (username,))
             
             result = cursor.fetchone()
             if not result:
                 conn.close()
-                return False, "Invalid email or password.", {}
+                return False, "Invalid username or password.", {}
             
-            user_id, password_hash, is_verified, sub_type, sub_expires = result
+            user_id, password_hash, sub_type, sub_expires, stripe_customer_id, stripe_subscription_id = result
             
             if not AuthManager.verify_password(password, password_hash):
                 conn.close()
-                return False, "Invalid email or password.", {}
-            
-            if not is_verified:
-                conn.close()
-                return False, "Please verify your account first.", {}
+                return False, "Invalid username or password.", {}
             
             # Check subscription status
             if sub_expires:
                 sub_expires_dt = datetime.fromisoformat(sub_expires)
-                if datetime.now() > sub_expires_dt:
+                if datetime.now() > sub_expires_dt and sub_type != 'plus':
                     # Update subscription to expired
                     cursor.execute("UPDATE users SET subscription_type = 'expired' WHERE id = ?", (user_id,))
                     conn.commit()
@@ -5205,15 +5100,110 @@ class AuthManager:
             
             user_info = {
                 'id': user_id,
-                'email': email,
+                'username': username,
                 'subscription_type': sub_type,
-                'subscription_expires': sub_expires_dt
+                'subscription_expires': sub_expires_dt,
+                'stripe_customer_id': stripe_customer_id,
+                'stripe_subscription_id': stripe_subscription_id
             }
             
             return True, "Login successful!", user_info
             
         except Exception as e:
             return False, f"Login error: {str(e)}", {}
+
+# Payment Functions
+class PaymentManager:
+    @staticmethod
+    def create_stripe_customer(username: str) -> Optional[str]:
+        """Create a Stripe customer"""
+        if not STRIPE_AVAILABLE or not SECRETS['STRIPE_SECRET_KEY']:
+            return None
+        
+        try:
+            customer = stripe.Customer.create(
+                metadata={'username': username}
+            )
+            return customer.id
+        except Exception as e:
+            st.error(f"Error creating Stripe customer: {e}")
+            return None
+    
+    @staticmethod
+    def create_checkout_session(user_id: int, username: str, price_id: str, plan_type: str) -> Optional[str]:
+        """Create a Stripe checkout session"""
+        if not STRIPE_AVAILABLE or not SECRETS['STRIPE_SECRET_KEY']:
+            return None
+        
+        try:
+            # Get or create Stripe customer
+            conn = sqlite3.connect('technova.db', timeout=10)
+            cursor = conn.cursor()
+            cursor.execute("SELECT stripe_customer_id FROM users WHERE id = ?", (user_id,))
+            result = cursor.fetchone()
+            
+            customer_id = result[0] if result and result[0] else None
+            
+            if not customer_id:
+                customer_id = PaymentManager.create_stripe_customer(username)
+                if customer_id:
+                    cursor.execute("UPDATE users SET stripe_customer_id = ? WHERE id = ?", (customer_id, user_id))
+                    conn.commit()
+            
+            conn.close()
+            
+            if not customer_id:
+                return None
+            
+            session = stripe.checkout.Session.create(
+                customer=customer_id,
+                payment_method_types=['card'],
+                line_items=[{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=f"{SECRETS['BASE_URL']}?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{SECRETS['BASE_URL']}?canceled=true",
+                metadata={
+                    'user_id': user_id,
+                    'plan_type': plan_type
+                }
+            )
+            
+            return session.url
+        except Exception as e:
+            st.error(f"Error creating checkout session: {e}")
+            return None
+    
+    @staticmethod
+    def handle_successful_payment(session_id: str):
+        """Handle successful payment"""
+        if not STRIPE_AVAILABLE or not SECRETS['STRIPE_SECRET_KEY']:
+            return
+        
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+            if session.payment_status == 'paid':
+                user_id = int(session.metadata.get('user_id'))
+                subscription_id = session.subscription
+                
+                # Update user subscription
+                conn = sqlite3.connect('technova.db', timeout=10)
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE users 
+                    SET subscription_type = 'plus', 
+                        stripe_subscription_id = ?,
+                        subscription_expires = NULL
+                    WHERE id = ?
+                ''', (subscription_id, user_id))
+                conn.commit()
+                conn.close()
+                
+                st.success("Payment successful! Your TechNova Plus subscription is now active.")
+        except Exception as e:
+            st.error(f"Error processing payment: {e}")
 
 # Usage Tracking Functions
 class UsageManager:
@@ -5310,6 +5300,13 @@ if 'user_info' not in st.session_state:
 if 'page' not in st.session_state:
     st.session_state.page = 'login'
 
+# Handle payment success from URL parameters
+query_params = st.experimental_get_query_params()
+if 'success' in query_params and 'session_id' in query_params:
+    PaymentManager.handle_successful_payment(query_params['session_id'][0])
+    # Clear query parameters
+    st.experimental_set_query_params()
+
 # Styling
 def set_tech_styling():
     st.markdown("""
@@ -5363,6 +5360,15 @@ def set_tech_styling():
         margin: 15px 0;
     }
     
+    .payment-card {
+        background: rgba(0, 249, 255, 0.05);
+        border: 1px solid rgba(0, 249, 255, 0.2);
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px 0;
+        text-align: center;
+    }
+    
     .stTextArea textarea, .stTextInput input {
         background: rgba(0, 20, 40, 0.8) !important;
         border: 1px solid rgba(0, 249, 255, 0.3) !important;
@@ -5391,18 +5397,15 @@ def login_page():
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("🔐 Login")
             
-            if not EMAIL_AVAILABLE:
-                st.info("Running in demo mode - email verification disabled")
-            
-            email = st.text_input("Gmail Address", placeholder="your.email@gmail.com")
+            username = st.text_input("Username", placeholder="Enter your username")
             password = st.text_input("Password", type="password")
             
             col_login, col_signup = st.columns(2)
             
             with col_login:
                 if st.button("Login", use_container_width=True):
-                    if email and password:
-                        success, message, user_info = AuthManager.login_user(email, password)
+                    if username and password:
+                        success, message, user_info = AuthManager.login_user(username, password)
                         if success:
                             st.session_state.authenticated = True
                             st.session_state.user_info = user_info
@@ -5411,7 +5414,7 @@ def login_page():
                         else:
                             st.error(message)
                     else:
-                        st.error("Please enter both email and password.")
+                        st.error("Please enter both username and password.")
             
             with col_signup:
                 if st.button("Sign Up", use_container_width=True):
@@ -5430,10 +5433,8 @@ def signup_page():
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("📝 Create TechNova Account")
             
-            if not EMAIL_AVAILABLE:
-                st.info("Running in demo mode - accounts will be auto-verified")
-            
-            email = st.text_input("Gmail Address", placeholder="your.email@gmail.com")
+            username = st.text_input("Username", placeholder="Choose a username (3-20 characters)")
+            st.caption("Username can contain letters, numbers, and underscores only")
             password = st.text_input("Password", type="password")
             confirm_password = st.text_input("Confirm Password", type="password")
             
@@ -5441,55 +5442,14 @@ def signup_page():
             
             with col_create:
                 if st.button("Create Account", use_container_width=True):
-                    if not email or not password or not confirm_password:
+                    if not username or not password or not confirm_password:
                         st.error("Please fill in all fields.")
                     elif password != confirm_password:
                         st.error("Passwords do not match.")
                     elif len(password) < 6:
                         st.error("Password must be at least 6 characters long.")
                     else:
-                        success, message = AuthManager.create_user(email, password)
-                        if success:
-                            st.success(message)
-                            if EMAIL_AVAILABLE:
-                                st.session_state.page = 'verify'
-                                st.session_state.verification_email = email
-                            else:
-                                st.session_state.page = 'login'
-                            st.rerun()
-                        else:
-                            st.error(message)
-            
-            with col_back:
-                if st.button("Back to Login", use_container_width=True):
-                    st.session_state.page = 'login'
-                    st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-
-def verify_page():
-    st.markdown('<h1 class="main-title">🌌 TECHNOVA AI NEXUS</h1>', unsafe_allow_html=True)
-    
-    with st.container():
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-            st.subheader("✉️ Verify Your Account")
-            
-            st.info(f"A verification code has been sent to {st.session_state.get('verification_email', 'your email')}.")
-            
-            verification_code = st.text_input("Enter 6-digit verification code", max_chars=6)
-            
-            col_verify, col_back = st.columns(2)
-            
-            with col_verify:
-                if st.button("Verify", use_container_width=True):
-                    if verification_code and len(verification_code) == 6:
-                        success, message = AuthManager.verify_user(
-                            st.session_state.get('verification_email'), 
-                            verification_code
-                        )
+                        success, message = AuthManager.create_user(username, password)
                         if success:
                             st.success(message)
                             st.balloons()
@@ -5497,8 +5457,6 @@ def verify_page():
                             st.rerun()
                         else:
                             st.error(message)
-                    else:
-                        st.error("Please enter a valid 6-digit code.")
             
             with col_back:
                 if st.button("Back to Login", use_container_width=True):
@@ -5507,7 +5465,7 @@ def verify_page():
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-# Main Application Pages
+# Subscription Management
 def show_subscription_info():
     """Display subscription information and usage stats"""
     user_info = st.session_state.user_info
@@ -5536,10 +5494,65 @@ def show_subscription_info():
         st.markdown("""
         <div class="usage-warning">
             <strong>⚠️ Trial Expired</strong><br>
-            Please upgrade to TechNova Plus to continue using the service.<br>
-            <strong>$15/month</strong> or <strong>$150/year (30% off)</strong>
+            Please upgrade to TechNova Plus to continue using the service.
         </div>
         """, unsafe_allow_html=True)
+        
+        # Show upgrade options
+        if STRIPE_AVAILABLE and SECRETS['STRIPE_SECRET_KEY']:
+            st.subheader("Upgrade to TechNova Plus")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("""
+                <div class="payment-card">
+                    <h4>Monthly Plan</h4>
+                    <h3>$15/month</h3>
+                    <p>• Unlimited usage<br>
+                    • All features<br>
+                    • Cancel anytime</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("Subscribe Monthly", key="monthly", use_container_width=True):
+                    if SECRETS['STRIPE_MONTHLY_PRICE_ID']:
+                        url = PaymentManager.create_checkout_session(
+                            user_info['id'], 
+                            user_info['username'], 
+                            SECRETS['STRIPE_MONTHLY_PRICE_ID'], 
+                            'monthly'
+                        )
+                        if url:
+                            st.markdown(f'<meta http-equiv="refresh" content="0;url={url}">', unsafe_allow_html=True)
+                    else:
+                        st.error("Monthly price ID not configured")
+            
+            with col2:
+                st.markdown("""
+                <div class="payment-card">
+                    <h4>Annual Plan</h4>
+                    <h3>$150/year</h3>
+                    <p>• Save 30%<br>
+                    • Unlimited usage<br>
+                    • All features</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("Subscribe Annually", key="annual", use_container_width=True):
+                    if SECRETS['STRIPE_ANNUAL_PRICE_ID']:
+                        url = PaymentManager.create_checkout_session(
+                            user_info['id'], 
+                            user_info['username'], 
+                            SECRETS['STRIPE_ANNUAL_PRICE_ID'], 
+                            'annual'
+                        )
+                        if url:
+                            st.markdown(f'<meta http-equiv="refresh" content="0;url={url}">', unsafe_allow_html=True)
+                    else:
+                        st.error("Annual price ID not configured")
+        else:
+            st.info("Payment system not configured. Contact administrator for upgrade options.")
     
     # Show daily usage stats
     usage_stats = UsageManager.get_usage_stats(user_info['id'])
@@ -5555,15 +5568,6 @@ def check_tab_access(tab_name: str) -> bool:
     
     if not can_use:
         st.error(message)
-        if "expired" in message.lower():
-            st.markdown("""
-            ### Upgrade to TechNova Plus
-            
-            **Monthly Plan**: $15/month
-            **Annual Plan**: $150/year (Save 30%)
-            
-            Contact support to upgrade your account.
-            """)
         return False
     
     return True
@@ -5857,7 +5861,7 @@ def main_application():
     
     # Sidebar with user info and logout
     with st.sidebar:
-        st.subheader(f"Welcome, {st.session_state.user_info.get('email', 'User')}")
+        st.subheader(f"Welcome, {st.session_state.user_info.get('username', 'User')}")
         
         show_subscription_info()
         
@@ -5973,7 +5977,6 @@ def main_application():
                     
                     # Progress bar for readability
                     st.subheader("Readability Score")
-                    progress_color = "green" if analysis['readability_score'] > 70 else "orange" if analysis['readability_score'] > 40 else "red"
                     st.progress(analysis['readability_score'] / 100)
                     
                     # Create analysis summary
@@ -6000,13 +6003,7 @@ def main_application():
         
         url_input = st.text_input("Enter website URL:", placeholder="https://example.com")
         
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            pass
-        with col2:
-            scrape_button = st.button("🔄 Scrape Content", type="primary")
-        
-        if scrape_button:
+        if st.button("🔄 Scrape Content", type="primary"):
             if url_input.strip():
                 log_tab_usage("Web Scraper")
                 
@@ -6101,8 +6098,6 @@ def main():
                 login_page()
             elif st.session_state.page == 'signup':
                 signup_page()
-            elif st.session_state.page == 'verify':
-                verify_page()
             else:
                 login_page()
         else:
