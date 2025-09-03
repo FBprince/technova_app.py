@@ -9929,8 +9929,6 @@
 
 
 
-
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -10559,49 +10557,284 @@ def set_tech_styling():
         margin: 15px 0;
     }
     
-    .copy-success {
-        background: rgba(40, 167, 69, 0.2);
-        border: 1px solid #28a745;
-        border-radius: 4px;
-        padding: 5px 10px;
-        color: #28a745;
-        font-size: 0.9em;
-        margin-left: 10px;
-        display: inline-block;
-    }
-    
     .action-buttons {
         display: flex;
         gap: 10px;
-        margin: 15px 0;
+        margin: 10px 0;
         flex-wrap: wrap;
     }
     
     .action-button {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.15), rgba(0, 153, 204, 0.25)) !important;
-        border: 1px solid rgba(0, 249, 255, 0.4) !important;
-        color: #00f9ff !important;
-        padding: 10px 20px !important;
-        border-radius: 8px !important;
-        cursor: pointer !important;
-        font-weight: 500 !important;
-        transition: all 0.3s ease !important;
-        text-decoration: none !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 8px !important;
+        background: linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3));
+        border: 1px solid rgba(0, 249, 255, 0.5);
+        color: #00f9ff;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        text-decoration: none;
+        display: inline-block;
+        margin: 2px;
     }
     
     .action-button:hover {
-        background: linear-gradient(135deg, rgba(0, 249, 255, 0.25), rgba(0, 153, 204, 0.35)) !important;
-        border-color: rgba(0, 249, 255, 0.6) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0, 249, 255, 0.3) !important;
+        background: linear-gradient(135deg, rgba(0, 249, 255, 0.3), rgba(0, 153, 204, 0.4));
+        color: #00f9ff;
     }
     </style>
     """, unsafe_allow_html=True)
 
 set_tech_styling()
+
+# Utility Functions
+def create_download_link(text: str, filename: str, file_type: str = "txt") -> str:
+    """Create a download link for text content"""
+    if text is None:
+        text = ""
+    
+    # Create the file content
+    b64 = base64.b64encode(text.encode()).decode()
+    
+    # Determine MIME type
+    mime_types = {
+        "txt": "text/plain",
+        "md": "text/markdown", 
+        "html": "text/html",
+        "py": "text/x-python",
+        "js": "text/javascript",
+        "css": "text/css",
+        "json": "application/json"
+    }
+    
+    mime_type = mime_types.get(file_type.lower(), "text/plain")
+    
+    return f'<a href="data:{mime_type};base64,{b64}" download="{filename}" class="action-button">📥 Download {file_type.upper()}</a>'
+
+def copy_and_download_buttons(text: str, filename_base: str, label: str = "Result", key: str = None):
+    """Enhanced copy and download buttons with better error handling"""
+    if text is None:
+        text = ""
+    
+    import html
+    escaped_text = html.escape(str(text)).replace('"', '&quot;').replace("'", "&#39;").replace('\n', '\\n').replace('\r', '\\r')
+    button_key = f"copy_btn_{key}" if key else f"copy_btn_{abs(hash(str(text)[:50]))}"
+    
+    # Create download link
+    download_link = create_download_link(text, f"{filename_base}.txt", "txt")
+    
+    copy_download_html = f"""
+    <div class="action-buttons">
+        <button onclick="copyToClipboard_{button_key}()" class="action-button" id="copy_btn_{button_key}">
+            📋 Copy {label}
+        </button>
+        {download_link}
+    </div>
+    
+    <script>
+    function copyToClipboard_{button_key}() {{
+        const text = `{escaped_text}`;
+        const cleanText = text.replace(/\\n/g, '\\n').replace(/\\r/g, '\\r');
+        
+        if (navigator.clipboard && window.isSecureContext) {{
+            navigator.clipboard.writeText(cleanText).then(function() {{
+                const btn = document.getElementById('copy_btn_{button_key}');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.style.background = 'linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3))';
+                setTimeout(function() {{
+                    btn.innerHTML = originalText;
+                    btn.style.background = 'linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3))';
+                }}, 2000);
+            }}).catch(function(err) {{
+                console.error('Could not copy text: ', err);
+                fallbackCopyTextToClipboard_{button_key}(cleanText);
+            }});
+        }} else {{
+            fallbackCopyTextToClipboard_{button_key}(cleanText);
+        }}
+    }}
+    
+    function fallbackCopyTextToClipboard_{button_key}(text) {{
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {{
+            const successful = document.execCommand('copy');
+            const btn = document.getElementById('copy_btn_{button_key}');
+            if (successful) {{
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.style.background = 'linear-gradient(135deg, rgba(0, 255, 0, 0.2), rgba(0, 200, 0, 0.3))';
+                setTimeout(function() {{
+                    btn.innerHTML = originalText;
+                    btn.style.background = 'linear-gradient(135deg, rgba(0, 249, 255, 0.2), rgba(0, 153, 204, 0.3))';
+                }}, 2000);
+            }} else {{
+                btn.innerHTML = '❌ Copy failed';
+                setTimeout(function() {{
+                    btn.innerHTML = originalText;
+                }}, 2000);
+            }}
+        }} catch (err) {{
+            console.error('Fallback: Unable to copy', err);
+        }}
+        
+        document.body.removeChild(textArea);
+    }}
+    </script>
+    """
+    
+    components.html(copy_download_html, height=80)
+
+def copy_button(text: str, label: str = "Copy", key: str = None):
+    """Simple copy button for backward compatibility"""
+    copy_and_download_buttons(text, "content", label, key)
+
+def extract_text_from_pdf(pdf_file):
+    """Extract text from uploaded PDF file"""
+    if not PDF_AVAILABLE:
+        return "PDF processing not available. Please install PyPDF2."
+    
+    try:
+        reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    except Exception as e:
+        return f"Error reading PDF: {str(e)}"
+
+def get_openai_response(prompt: str, system_prompt: str = "") -> str:
+    """Get response from OpenAI API using the new client interface"""
+    if not OPENAI_AVAILABLE or not openai_client:
+        return "OpenAI API not configured. Please add your API key to the secrets."
+    
+    try:
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=1500,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error calling OpenAI API: {str(e)}"
+
+def scrape_website(url: str) -> str:
+    """Scrape text content from a website with improved error handling"""
+    try:
+        # Add protocol if missing
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Remove script and style elements
+        for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
+            script.decompose()
+        
+        # Try to find main content area
+        main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=re.compile(r'content|article|post|main'))
+        
+        if main_content:
+            text = main_content.get_text()
+        else:
+            text = soup.get_text()
+        
+        # Clean up text
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = ' '.join(chunk for chunk in chunks if chunk)
+        
+        # Return full text but limit for display
+        return text
+        
+    except requests.RequestException as e:
+        return f"Error fetching website: {str(e)}"
+    except Exception as e:
+        return f"Error processing website content: {str(e)}"
+
+def get_website_title(url: str) -> str:
+    """Extract title from website"""
+    try:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        title = soup.find('title')
+        
+        if title:
+            return title.get_text().strip()
+        else:
+            return url
+            
+    except Exception:
+        return url
+
+# Q&A Function for context-based questions
+def get_contextual_qa_response(question: str, context: str, context_type: str = "document") -> str:
+    """Get Q&A response based on provided context"""
+    if not OPENAI_AVAILABLE or not openai_client:
+        return "OpenAI API not configured. Please add your API key to the secrets."
+    
+    try:
+        system_prompt = f"""You are a helpful AI assistant that answers questions based on provided context.
+        
+        Primary task: Answer the user's question based on the {context_type} content provided.
+        
+        Instructions:
+        1. If the question is directly related to the provided content, answer based on that content
+        2. If the question is partially related, use the content where relevant and supplement with general knowledge
+        3. If the question is not related to the content, provide a helpful general answer
+        4. Always be clear about whether your answer comes from the provided content or general knowledge
+        5. Be conversational and helpful in your responses"""
+        
+        prompt = f"""Context from {context_type}:
+{context[:4000]}  # Limit context size
+
+User question: {question}
+
+Please answer the question. If it relates to the provided content, base your answer on that content. If not directly related, still provide a helpful response using your general knowledge."""
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1000,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error getting AI response: {str(e)}"
 
 # Authentication Pages
 def login_page():
@@ -10794,284 +11027,6 @@ def log_tab_usage(tab_name: str):
     user_id = st.session_state.user_info['id']
     UsageManager.log_usage(user_id, tab_name)
 
-# Enhanced Utility Functions
-def create_download_link(text_content: str, filename: str, link_text: str = "Download", file_type: str = "txt") -> str:
-    """Create a download link for text content"""
-    try:
-        if file_type == "txt":
-            b64 = base64.b64encode(text_content.encode()).decode()
-            mime_type = "text/plain"
-        elif file_type == "md":
-            b64 = base64.b64encode(text_content.encode()).decode()
-            mime_type = "text/markdown"
-        elif file_type == "py":
-            b64 = base64.b64encode(text_content.encode()).decode()
-            mime_type = "text/x-python"
-        elif file_type == "js":
-            b64 = base64.b64encode(text_content.encode()).decode()
-            mime_type = "text/javascript"
-        elif file_type == "html":
-            b64 = base64.b64encode(text_content.encode()).decode()
-            mime_type = "text/html"
-        else:
-            b64 = base64.b64encode(text_content.encode()).decode()
-            mime_type = "text/plain"
-        
-        return f'<a href="data:{mime_type};base64,{b64}" download="{filename}" class="action-button">📥 {link_text}</a>'
-    except Exception as e:
-        return f'<span style="color: #ff6b6b;">Download error: {str(e)}</span>'
-
-def enhanced_copy_button(text: str, label: str = "Copy", key: str = None, filename: str = None, file_type: str = "txt"):
-    """Enhanced copy button with download functionality and better error handling"""
-    if text is None:
-        text = ""
-    
-    # Clean and validate text
-    text = str(text).strip()
-    if not text:
-        st.warning("No content to copy/download")
-        return
-    
-    # Generate unique button ID
-    unique_id = f"{key}_{abs(hash(text[:100]))}" if key else f"btn_{abs(hash(text[:100]))}"
-    
-    # Escape text for JavaScript (handle quotes, newlines, etc.)
-    def js_escape(text):
-        """Properly escape text for JavaScript"""
-        return (text
-                .replace('\\', '\\\\')
-                .replace('`', '\\`')
-                .replace(', '\\)
-                .replace('\r\n', '\\n')
-                .replace('\n', '\\n')
-                .replace('\r', '\\r')
-                .replace('"', '\\"')
-                .replace("'", "\\'"))
-    
-    escaped_text = js_escape(text)
-    
-    # Create download link if filename provided
-    download_link = ""
-    if filename:
-        download_link = create_download_link(text, filename, f"Download {file_type.upper()}", file_type)
-    
-    # Enhanced copy/download HTML component
-    copy_download_html = f"""
-    <div style="margin: 15px 0;">
-        <div class="action-buttons">
-            <button id="copyBtn_{unique_id}" onclick="copyToClipboard_{unique_id}()" class="action-button">
-                📋 {label}
-            </button>
-            {download_link}
-        </div>
-        <div id="status_{unique_id}" style="margin-top: 10px; min-height: 20px;"></div>
-    </div>
-    
-    <script>
-    function copyToClipboard_{unique_id}() {{
-        const text = `{escaped_text}`;
-        const statusDiv = document.getElementById('status_{unique_id}');
-        const copyBtn = document.getElementById('copyBtn_{unique_id}');
-        
-        // Modern clipboard API
-        if (navigator.clipboard && navigator.clipboard.writeText) {{
-            navigator.clipboard.writeText(text).then(function() {{
-                statusDiv.innerHTML = '<span class="copy-success">✅ Copied to clipboard!</span>';
-                copyBtn.innerHTML = '✅ Copied!';
-                setTimeout(() => {{
-                    statusDiv.innerHTML = '';
-                    copyBtn.innerHTML = '📋 {label}';
-                }}, 2000);
-            }}).catch(function(err) {{
-                console.error('Clipboard API failed: ', err);
-                fallbackCopy_{unique_id}(text, statusDiv, copyBtn);
-            }});
-        }} else {{
-            // Fallback for older browsers
-            fallbackCopy_{unique_id}(text, statusDiv, copyBtn);
-        }}
-    }}
-    
-    function fallbackCopy_{unique_id}(text, statusDiv, copyBtn) {{
-        try {{
-            // Create temporary textarea
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.top = '-1000px';
-            textArea.style.left = '-1000px';
-            textArea.style.width = '1px';
-            textArea.style.height = '1px';
-            textArea.style.opacity = '0';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            
-            if (successful) {{
-                statusDiv.innerHTML = '<span class="copy-success">✅ Copied to clipboard!</span>';
-                copyBtn.innerHTML = '✅ Copied!';
-                setTimeout(() => {{
-                    statusDiv.innerHTML = '';
-                    copyBtn.innerHTML = '📋 {label}';
-                }}, 2000);
-            }} else {{
-                statusDiv.innerHTML = '<span style="color: #ff6b6b;">❌ Copy failed. Please select and copy manually.</span>';
-                setTimeout(() => statusDiv.innerHTML = '', 3000);
-            }}
-        }} catch (err) {{
-            console.error('Fallback copy failed: ', err);
-            statusDiv.innerHTML = '<span style="color: #ff6b6b;">❌ Copy not supported. Please select and copy manually.</span>';
-            setTimeout(() => statusDiv.innerHTML = '', 3000);
-        }}
-    }}
-    </script>
-    """
-    
-    components.html(copy_download_html, height=80)
-
-def extract_text_from_pdf(pdf_file):
-    """Extract text from uploaded PDF file"""
-    if not PDF_AVAILABLE:
-        return "PDF processing not available. Please install PyPDF2."
-    
-    try:
-        reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-        return text
-    except Exception as e:
-        return f"Error reading PDF: {str(e)}"
-
-def get_openai_response(prompt: str, system_prompt: str = "") -> str:
-    """Get response from OpenAI API using the new client interface"""
-    if not OPENAI_AVAILABLE or not openai_client:
-        return "OpenAI API not configured. Please add your API key to the secrets."
-    
-    try:
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        
-        response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=1500,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"Error calling OpenAI API: {str(e)}"
-
-def scrape_website(url: str) -> str:
-    """Scrape text content from a website with improved error handling"""
-    try:
-        # Add protocol if missing
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Remove script and style elements
-        for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
-            script.decompose()
-        
-        # Try to find main content area
-        main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=re.compile(r'content|article|post|main'))
-        
-        if main_content:
-            text = main_content.get_text()
-        else:
-            text = soup.get_text()
-        
-        # Clean up text
-        lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = ' '.join(chunk for chunk in chunks if chunk)
-        
-        # Return full text but limit for display
-        return text
-        
-    except requests.RequestException as e:
-        return f"Error fetching website: {str(e)}"
-    except Exception as e:
-        return f"Error processing website content: {str(e)}"
-
-def get_website_title(url: str) -> str:
-    """Extract title from website"""
-    try:
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        title = soup.find('title')
-        
-        if title:
-            return title.get_text().strip()
-        else:
-            return url
-            
-    except Exception:
-        return url
-
-# Q&A Function for context-based questions
-def get_contextual_qa_response(question: str, context: str, context_type: str = "document") -> str:
-    """Get Q&A response based on provided context"""
-    if not OPENAI_AVAILABLE or not openai_client:
-        return "OpenAI API not configured. Please add your API key to the secrets."
-    
-    try:
-        system_prompt = f"""You are a helpful AI assistant that answers questions based on provided context.
-        
-        Primary task: Answer the user's question based on the {context_type} content provided.
-        
-        Instructions:
-        1. If the question is directly related to the provided content, answer based on that content
-        2. If the question is partially related, use the content where relevant and supplement with general knowledge
-        3. If the question is not related to the content, provide a helpful general answer
-        4. Always be clear about whether your answer comes from the provided content or general knowledge
-        5. Be conversational and helpful in your responses"""
-        
-        prompt = f"""Context from {context_type}:
-{context[:4000]}  # Limit context size
-
-User question: {question}
-
-Please answer the question. If it relates to the provided content, base your answer on that content. If not directly related, still provide a helpful response using your general knowledge."""
-        
-        response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=1000,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"Error getting AI response: {str(e)}"
-
 # AI Tool Functions
 def text_summarizer_tab():
     """Enhanced Text Summarization Tool with Q&A functionality"""
@@ -11146,22 +11101,13 @@ def text_summarizer_tab():
                 
                 summary = get_openai_response(prompt, "You are a helpful assistant specialized in creating clear, concise summaries.")
                 
-                if summary:
+                if summary and not summary.startswith("Error"):
                     log_tab_usage("Text Summarizer")
                     st.markdown('<div class="result-box">', unsafe_allow_html=True)
                     st.write("**Summary:**")
                     st.write(summary)
                     st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Generate filename based on content source
-                    if "PDF" in content_source:
-                        filename = f"summary_{content_source.split('(')[1].split(')')[0].replace('.pdf', '')}.txt"
-                    elif "website" in content_source:
-                        filename = "website_summary.txt"
-                    else:
-                        filename = "text_summary.txt"
-                    
-                    enhanced_copy_button(summary, "Copy Summary", "summary", filename, "txt")
+                    copy_and_download_buttons(summary, "text_summary", "Summary", "summary")
                 else:
                     st.error("Failed to generate summary. Please try again.")
     
@@ -11180,17 +11126,14 @@ def text_summarizer_tab():
             with st.spinner("Analyzing content and generating answer..."):
                 answer = get_contextual_qa_response(question, st.session_state.summarizer_content, st.session_state.summarizer_source)
                 
-                if answer:
+                if answer and not answer.startswith("Error"):
                     log_tab_usage("Text Summarizer")
                     st.markdown('<div class="result-box">', unsafe_allow_html=True)
                     st.write(f"**Question:** {question}")
                     st.write(f"**Answer:**")
                     st.write(answer)
                     st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Create Q&A filename
-                    qa_content = f"Question: {question}\n\nAnswer: {answer}"
-                    enhanced_copy_button(qa_content, "Copy Q&A", "summarizer_answer", "qa_response.txt", "txt")
+                    copy_and_download_buttons(f"Question: {question}\n\nAnswer: {answer}", "qa_answer", "Answer", "summarizer_answer")
                 else:
                     st.error("Failed to generate answer. Please try again.")
         
@@ -11265,17 +11208,13 @@ def web_fetcher_tab():
                     
                     summary = get_openai_response(prompt, system_prompt)
                     
-                    if summary:
+                    if summary and not summary.startswith("Error"):
                         log_tab_usage("Web Fetcher")
                         st.markdown('<div class="result-box">', unsafe_allow_html=True)
                         st.write(f"**📋 Summary of {website_title}:**")
                         st.write(summary)
                         st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        # Enhanced copy/download with proper filename
-                        safe_title = re.sub(r'[^\w\s-]', '', website_title)[:50]
-                        filename = f"{safe_title}_summary.txt".replace(' ', '_')
-                        enhanced_copy_button(summary, "Copy Summary", "web_summary", filename, "txt")
+                        copy_and_download_buttons(f"Summary of: {website_title}\nURL: {url}\n\n{summary}", "web_summary", "Summary", "web_summary")
                     else:
                         st.error("Failed to generate summary. Please try again.")
             else:
@@ -11293,11 +11232,7 @@ def web_fetcher_tab():
             st.write(f"**Title:** {st.session_state.web_title}")
             st.write(f"**URL:** {st.session_state.web_url}")
             st.write(f"**Content Length:** {len(st.session_state.web_content)} characters")
-            
-            # Download full content option
-            safe_title = re.sub(r'[^\w\s-]', '', st.session_state.web_title)[:50]
-            content_filename = f"{safe_title}_full_content.txt".replace(' ', '_')
-            enhanced_copy_button(st.session_state.web_content, "Copy Full Content", "web_full_content", content_filename, "txt")
+            st.text_area("Content Preview:", st.session_state.web_content[:500] + "...", height=100, disabled=True)
         
         question = st.text_input("Enter your question:", 
                                 placeholder="What would you like to know about this webpage?",
@@ -11310,17 +11245,14 @@ def web_fetcher_tab():
                 with st.spinner("Analyzing webpage and generating answer..."):
                     answer = get_contextual_qa_response(question, st.session_state.web_content, f"webpage ({st.session_state.web_title})")
                     
-                    if answer:
+                    if answer and not answer.startswith("Error"):
                         log_tab_usage("Web Fetcher")
                         st.markdown('<div class="result-box">', unsafe_allow_html=True)
                         st.write(f"**Question:** {question}")
                         st.write(f"**Answer:**")
                         st.write(answer)
                         st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        # Create Q&A content for download
-                        qa_content = f"Webpage: {st.session_state.web_title}\nURL: {st.session_state.web_url}\n\nQuestion: {question}\n\nAnswer: {answer}"
-                        enhanced_copy_button(qa_content, "Copy Q&A", "web_answer", "webpage_qa.txt", "txt")
+                        copy_and_download_buttons(f"Website: {st.session_state.web_title}\nQuestion: {question}\n\nAnswer: {answer}", "web_qa", "Answer", "web_answer")
                     else:
                         st.error("Failed to generate answer. Please try again.")
         
@@ -11382,6 +11314,12 @@ def code_generator_tab():
         
         if st.button("Generate Code", use_container_width=True, key="generate_btn") and description:
             with st.spinner("Generating code..."):
+                length_map = {
+                    "Short": "in 2-3 sentences", 
+                    "Medium": "in 1-2 paragraphs", 
+                    "Long": "in 3-4 paragraphs"
+                }
+                
                 system_prompt = f"""You are an expert programmer. Generate clean, efficient, and well-structured {language} code.
                 Always include proper error handling where appropriate.
                 Code style preference: {code_style}
@@ -11392,23 +11330,23 @@ def code_generator_tab():
                 
                 code = get_openai_response(prompt, system_prompt)
                 
-                if code:
+                if code and not code.startswith("Error"):
                     log_tab_usage("Code Generator")
                     st.markdown('<div class="result-box">', unsafe_allow_html=True)
                     st.write(f"**Generated {language} Code:**")
                     st.code(code, language=language.lower())
                     st.markdown('</div>', unsafe_allow_html=True)
                     
-                    # Determine file extension based on language
+                    # Determine file extension
                     ext_map = {
-                        "Python": "py", "JavaScript": "js", "Java": "java", "C++": "cpp", 
-                        "C#": "cs", "Go": "go", "Rust": "rs", "PHP": "php", "Ruby": "rb",
-                        "Swift": "swift", "Kotlin": "kt", "TypeScript": "ts", "HTML/CSS": "html"
+                        "Python": "py", "JavaScript": "js", "Java": "java", 
+                        "C++": "cpp", "C#": "cs", "Go": "go", "Rust": "rs",
+                        "PHP": "php", "Ruby": "rb", "Swift": "swift", 
+                        "Kotlin": "kt", "TypeScript": "ts", "HTML/CSS": "html"
                     }
                     file_ext = ext_map.get(language, "txt")
-                    filename = f"generated_code.{file_ext}"
                     
-                    enhanced_copy_button(code, "Copy Code", "generated_code", filename, file_ext)
+                    copy_and_download_buttons(code, f"generated_code.{file_ext}", "Code", "generated_code")
                 else:
                     st.error("Failed to generate code. Please try again.")
     
@@ -11463,7 +11401,7 @@ def code_generator_tab():
                 
                 analysis = get_openai_response(prompt, system_prompt)
                 
-                if analysis:
+                if analysis and not analysis.startswith("Error"):
                     log_tab_usage("Code Generator")
                     st.session_state.code_analysis = analysis
                     st.session_state.analyzed_code = code_to_analyze
@@ -11474,7 +11412,7 @@ def code_generator_tab():
                     st.markdown(analysis)
                     st.markdown('</div>', unsafe_allow_html=True)
                     
-                    enhanced_copy_button(analysis, "Copy Analysis", "code_analysis", "code_analysis.txt", "txt")
+                    copy_and_download_buttons(f"Code Analysis for {analyze_language}:\n\n{analysis}", "code_analysis", "Analysis", "code_analysis")
                 else:
                     st.error("Failed to analyze code. Please try again.")
         
@@ -11533,7 +11471,7 @@ Please {enhancement_type}."""
                     
                     enhanced_code = get_openai_response(prompt, system_prompt)
                     
-                    if enhanced_code:
+                    if enhanced_code and not enhanced_code.startswith("Error"):
                         log_tab_usage("Code Generator")
                         st.markdown('<div class="result-box">', unsafe_allow_html=True)
                         st.write("**Enhanced Code:**")
@@ -11559,49 +11497,45 @@ Please {enhancement_type}."""
                         
                         st.markdown('</div>', unsafe_allow_html=True)
                         
-                        # Enhanced copy/download for code
+                        # Determine file extension
                         ext_map = {
-                            "Python": "py", "JavaScript": "js", "Java": "java", "C++": "cpp", 
-                            "C#": "cs", "Go": "go", "Rust": "rs", "PHP": "php", "Ruby": "rb",
-                            "Swift": "swift", "Kotlin": "kt", "TypeScript": "ts", "HTML/CSS": "html", "SQL": "sql"
+                            "Python": "py", "JavaScript": "js", "Java": "java", 
+                            "C++": "cpp", "C#": "cs", "Go": "go", "Rust": "rs",
+                            "PHP": "php", "Ruby": "rb", "Swift": "swift", 
+                            "Kotlin": "kt", "TypeScript": "ts", "HTML/CSS": "html", "SQL": "sql"
                         }
                         file_ext = ext_map.get(st.session_state.analyzed_language, "txt")
-                        filename = f"enhanced_code.{file_ext}"
                         
-                        enhanced_copy_button(enhanced_code, "Copy Enhanced Code", "enhanced_code", filename, file_ext)
+                        copy_and_download_buttons(enhanced_code, f"enhanced_code.{file_ext}", "Enhanced Code", "enhanced_code")
                     else:
                         st.error("Failed to enhance code. Please try again.")
         
         # Additional options
         with st.expander("Additional Analysis Options"):
             st.write("**Quick Actions:**")
-            col1, col2 = st.columns(2)
+            if st.button("🎯 Performance Analysis", key="perf_analysis"):
+                if hasattr(st.session_state, 'analyzed_code'):
+                    with st.spinner("Analyzing performance..."):
+                        perf_prompt = f"Analyze the performance characteristics of this {st.session_state.analyzed_language} code and suggest optimizations:\n\n{st.session_state.analyzed_code}"
+                        perf_analysis = get_openai_response(perf_prompt, "You are a performance optimization expert. Focus on time complexity, space complexity, and optimization opportunities.")
+                        if perf_analysis and not perf_analysis.startswith("Error"):
+                            st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                            st.write("**Performance Analysis:**")
+                            st.markdown(perf_analysis)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            copy_and_download_buttons(perf_analysis, "performance_analysis", "Analysis", "perf_analysis")
             
-            with col1:
-                if st.button("🎯 Performance Analysis", key="perf_analysis", use_container_width=True):
-                    if hasattr(st.session_state, 'analyzed_code'):
-                        with st.spinner("Analyzing performance..."):
-                            perf_prompt = f"Analyze the performance characteristics of this {st.session_state.analyzed_language} code and suggest optimizations:\n\n{st.session_state.analyzed_code}"
-                            perf_analysis = get_openai_response(perf_prompt, "You are a performance optimization expert. Focus on time complexity, space complexity, and optimization opportunities.")
-                            if perf_analysis:
-                                st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                                st.write("**Performance Analysis:**")
-                                st.markdown(perf_analysis)
-                                st.markdown('</div>', unsafe_allow_html=True)
-                                enhanced_copy_button(perf_analysis, "Copy Analysis", "perf_analysis", "performance_analysis.txt", "txt")
-            
-            with col2:
-                if st.button("🔒 Security Review", key="security_review", use_container_width=True):
-                    if hasattr(st.session_state, 'analyzed_code'):
-                        with st.spinner("Reviewing security..."):
-                            security_prompt = f"Perform a security review of this {st.session_state.analyzed_language} code and identify vulnerabilities:\n\n{st.session_state.analyzed_code}"
-                            security_analysis = get_openai_response(security_prompt, "You are a cybersecurity expert specializing in code security reviews. Focus on common vulnerabilities and security best practices.")
-                            if security_analysis:
-                                st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                                st.write("**Security Review:**")
-                                st.markdown(security_analysis)
-                                st.markdown('</div>', unsafe_allow_html=True)
-                                enhanced_copy_button(security_analysis, "Copy Security Review", "security_analysis", "security_review.txt", "txt")
+            if st.button("🔒 Security Review", key="security_review"):
+                if hasattr(st.session_state, 'analyzed_code'):
+                    with st.spinner("Reviewing security..."):
+                        security_prompt = f"Perform a security review of this {st.session_state.analyzed_language} code and identify vulnerabilities:\n\n{st.session_state.analyzed_code}"
+                        security_analysis = get_openai_response(security_prompt, "You are a cybersecurity expert specializing in code security reviews. Focus on common vulnerabilities and security best practices.")
+                        if security_analysis and not security_analysis.startswith("Error"):
+                            st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                            st.write("**Security Review:**")
+                            st.markdown(security_analysis)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            copy_and_download_buttons(security_analysis, "security_review", "Review", "security_review")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -11678,7 +11612,7 @@ def content_writer_tab():
             
             content = get_openai_response(prompt, system_prompt)
             
-            if content:
+            if content and not content.startswith("Error"):
                 log_tab_usage("Content Writer")
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
                 st.write(f"**Generated {content_type}:**")
@@ -11689,10 +11623,9 @@ def content_writer_tab():
                 word_count = len(content.split())
                 st.info(f"Word count: {word_count}")
                 
-                # Enhanced copy/download with appropriate filename
-                safe_topic = re.sub(r'[^\w\s-]', '', topic)[:30].replace(' ', '_')
-                filename = f"{content_type.lower().replace(' ', '_')}_{safe_topic}.txt"
-                enhanced_copy_button(content, "Copy Content", "content", filename, "txt")
+                # Determine file type based on content
+                file_ext = "md" if any(header in content for header in ["#", "##", "###"]) else "txt"
+                copy_and_download_buttons(content, f"{content_type.lower().replace(' ', '_')}", "Content", "content")
             else:
                 st.error("Failed to generate content. Please try again.")
     
@@ -11717,13 +11650,11 @@ def data_analyzer_tab():
     data_input_method = st.radio("Data Input Method:", ["Paste Data", "Upload CSV"])
     
     data_text = ""
-    data_filename = ""
     
     if data_input_method == "Paste Data":
         data_text = st.text_area("Paste your data here:", 
                                 height=200,
                                 placeholder="Enter your data (CSV format, JSON, or any structured format)")
-        data_filename = "data_analysis"
     
     elif data_input_method == "Upload CSV":
         uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
@@ -11739,7 +11670,6 @@ def data_analyzer_tab():
                     # Convert to string for analysis
                     full_df = pd.read_csv(uploaded_file)
                     data_text = full_df.to_string()
-                    data_filename = uploaded_file.name.replace('.csv', '_analysis')
                 except Exception as e:
                     st.error(f"Error reading CSV: {e}")
     
@@ -11776,15 +11706,13 @@ def data_analyzer_tab():
             
             analysis = get_openai_response(prompt, system_prompt)
             
-            if analysis:
+            if analysis and not analysis.startswith("Error"):
                 log_tab_usage("Data Analyzer")
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
                 st.write("**Data Analysis Results:**")
                 st.markdown(analysis)
                 st.markdown('</div>', unsafe_allow_html=True)
-                
-                filename = f"{data_filename}.txt"
-                enhanced_copy_button(analysis, "Copy Analysis", "analysis", filename, "txt")
+                copy_and_download_buttons(f"Data Analysis - {analysis_type}\n\n{analysis}", "data_analysis", "Analysis", "analysis")
             else:
                 st.error("Failed to analyze data. Please try again.")
     
@@ -11850,21 +11778,18 @@ def language_translator_tab():
             
             translation = get_openai_response(prompt, system_prompt)
             
-            if translation:
+            if translation and not translation.startswith("Error"):
                 log_tab_usage("Language Translator")
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
                 st.write(f"**Translation ({target_lang}):**")
                 st.write(translation)
                 st.markdown('</div>', unsafe_allow_html=True)
                 
+                copy_and_download_buttons(f"Original ({source_lang}):\n{text_to_translate}\n\nTranslation ({target_lang}):\n{translation}", "translation", "Translation", "translation")
+                
                 # Character count info
                 char_count = len(text_to_translate)
                 st.info(f"Translated {char_count} characters")
-                
-                # Enhanced copy/download with language info
-                safe_target = target_lang.replace(" ", "_").replace("(", "").replace(")", "")
-                filename = f"translation_to_{safe_target}.txt"
-                enhanced_copy_button(translation, "Copy Translation", "translation", filename, "txt")
             else:
                 st.error("Failed to translate text. Please try again.")
     
@@ -11950,17 +11875,13 @@ def email_generator_tab():
             
             email = get_openai_response(prompt, system_prompt)
             
-            if email:
+            if email and not email.startswith("Error"):
                 log_tab_usage("Email Generator")
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
                 st.write("**Generated Email:**")
                 st.text(email)
                 st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Enhanced copy/download for email
-                safe_type = email_type.replace(" ", "_").lower()
-                filename = f"{safe_type}_email.txt"
-                enhanced_copy_button(email, "Copy Email", "email", filename, "txt")
+                copy_and_download_buttons(email, f"{email_type.lower().replace(' ', '_')}_email", "Email", "email")
             else:
                 st.error("Failed to generate email. Please try again.")
     
